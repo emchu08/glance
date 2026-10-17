@@ -1,5 +1,19 @@
 # Deployment
 
+## Live (verified October 17, 2026)
+
+| Surface | URL | Notes |
+| --- | --- | --- |
+| Root app (marketing, presenter, glasses, lens, wallet, APIs) | https://glance-blue.vercel.app | Vercel project `glance`, production; public (no deployment protection on production) |
+| Standalone 3D site | https://glance-website-lac.vercel.app | Vercel project `glance-website` (Vite static build) |
+| Stripe webhook | `we_1URfeG0lU2xH9eJlWHtbDXrh` → `/api/payments/webhook` | sandbox; signature verified against the raw body; `STRIPE_WEBHOOK_SECRET` set on Vercel |
+| Supabase | project `qpneiyefrsnlvmeumphi` (us) | migration `glance_init` applied |
+
+Checks run against production: `/api/health` 200 · `/`, `/glasses`, `/lens` 200 · `/api/glance/status` reports
+configured model, Stripe and Supabase · unsigned webhook → 400 · `/api/wallet` unauthenticated → 401 ·
+`/demo/screens` → 404 in production. Region: Vercel default (iad1) with Supabase in us-east; cross-region latency
+for an order round-trip is in the low hundreds of milliseconds in the presenter diagnostics.
+
 ## Vercel (root Next.js app)
 
 ```bash

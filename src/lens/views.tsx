@@ -211,7 +211,7 @@ function Picker() {
           </motion.button>
         );
       })}
-      <div className="lens-status" style={{ justifyContent: "center" }}>
+      <div className="lens-status" style={{ justifyContent: "center", bottom: 36, height: 30 }}>
         {state.pairing.status === "none"
           ? (state.capture === "sample" ? "Sample scenario · ↑↓ then select" : state.capture === "webcam" ? "Camera · ↑↓ then select" : "Glasses · ↑↓ then select")
           : `Glasses ${state.pairing.status === "connected" ? "connected" : state.pairing.status === "waiting" ? `· pair code ${state.pairing.code ?? "…"}` : `· ${state.pairing.status}`}`}

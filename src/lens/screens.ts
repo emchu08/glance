@@ -123,11 +123,8 @@ export function describeScreen(state: LensState): LensAction[] {
       return [{ id: "skip", label: "Skip", row: ACTION_ROW, x: 1, variant: "quiet", events: [{ type: "intro/done" }] }];
 
     case "picker": {
-      const rows: LensAction[] = (["glimpse", "grocery", "gourmet"] as Mode[]).map((m, i) => ({ id: `mode-${m}`, label: MODE_META[m].label, row: 1 + i, x: 0, variant: "row", events: [{ type: "mode/set", mode: m }], listIndex: i, hint: MODE_META[m].hint }));
-      if (state.wallet.status !== "ready" && state.wallet.status !== "unknown") {
-        rows.push({ id: "hdr-wallet", label: "Wallet", row: ACTION_ROW, x: 1, variant: "quiet", events: [{ type: "nav/push", screen: { id: "wallet" } }], effect: { kind: "wallet-refresh" } });
-      }
-      return rows;
+      // The wheel owns the whole square; the wallet is one chip away inside every mode.
+      return (["glimpse", "grocery", "gourmet"] as Mode[]).map((m, i): LensAction => ({ id: `mode-${m}`, label: MODE_META[m].label, row: 1 + i, x: 0, variant: "row", events: [{ type: "mode/set", mode: m }], listIndex: i, hint: MODE_META[m].hint }));
     }
 
     case "more":

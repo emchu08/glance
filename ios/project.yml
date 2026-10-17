@@ -15,7 +15,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ""            # set your team in Xcode → Signing & Capabilities
-    GLANCE_API_BASE: "https://glance-emchu08.vercel.app"   # production origin; dev builds override below
+    GLANCE_API_BASE: "https://glance-blue.vercel.app"   # production origin; dev builds override below
     META_APP_ID: ""                  # Meta developer app id for the Wearables Device Access Toolkit
     META_CLIENT_TOKEN: ""
   configs:

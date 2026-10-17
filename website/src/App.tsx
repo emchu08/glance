@@ -15,7 +15,7 @@ gsap.registerPlugin(ScrollTrigger);
 const Jacket = lazy(() => import("./scenes/Jacket"));
 const Meal = lazy(() => import("./scenes/Meal"));
 
-const LIVE_APP = (import.meta.env.VITE_LIVE_APP_URL as string | undefined) ?? "https://glance-emchu08.vercel.app";
+const LIVE_APP = (import.meta.env.VITE_LIVE_APP_URL as string | undefined) ?? "https://glance-blue.vercel.app";
 
 export function App() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
