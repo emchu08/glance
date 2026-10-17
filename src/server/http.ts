@@ -3,11 +3,13 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { z, type ZodType } from "zod";
 import { HttpError } from "./supabase";
+import { UrlError } from "./url";
 
 export const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "cache-control": "no-store" } });
 
 export function errorResponse(e: unknown): NextResponse {
   if (e instanceof HttpError) return json({ error: e.message, code: e.code ?? null }, e.status);
+  if (e instanceof UrlError) return json({ error: e.message, code: "bad_url" }, 400);
   if (e instanceof z.ZodError) return json({ error: "Invalid request", issues: e.issues.map((i) => `${i.path.join(".")}: ${i.message}`) }, 400);
   const msg = (e as Error)?.message ?? "Unexpected error";
   console.error("[api]", msg);

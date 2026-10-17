@@ -96,7 +96,7 @@ export function createWebcamAdapter(getDeviceId?: () => string | undefined): Cap
 
 export const RELAY = { frameTtlMs: 20_000, demandTtlMs: 10_000, presenceTtlMs: 30_000, staleThresholdMs: 8_000 };
 
-export function createNativeAdapter(getCode: () => string | null): CaptureAdapter {
+export function createNativeAdapter(codeRef: { current: string | null }): CaptureAdapter {
   let state: ReturnType<CaptureAdapter["status"]> = "idle";
   let lastUrl: string | null = null;
   let lastAt = 0;
@@ -105,7 +105,7 @@ export function createNativeAdapter(getCode: () => string | null): CaptureAdapte
     async start() { state = "ready"; },
     stop() { state = "idle"; },
     async capture(_mode, index, opts) {
-      const code = getCode();
+      const code = codeRef.current;
       if (!code) throw new Error("Not paired");
       const deadline = Date.now() + 12_000;
       for (;;) {

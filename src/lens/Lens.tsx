@@ -82,10 +82,15 @@ export function Lens({ interactive = true, scale = 1, instant = false, className
   );
 }
 
+const EYEBROW_SCREENS = new Set(["grocery-item", "glimpse-cart-item", "gourmet-recipe", "wallet-order"]);
+
 function ScreenHeading() {
   const { state } = useLens();
   const title = screenTitle(state);
   if (!title) return null;
+  // Screens whose body leads with the item name show the title as a short eyebrow instead.
+  const eyebrow = EYEBROW_SCREENS.has(state.screen.id) || ((state.screen.id === "glimpse" && state.glimpse.candidates.length > 0 && state.glimpse.scan !== "scanning") || (state.screen.id === "gourmet" && state.gourmet.hypotheses.length > 0 && state.gourmet.scan === "result"));
+  if (eyebrow) return <p className="lens-eyebrow">{title}</p>;
   const long = title.length > 22;
   return <h1 className={clsx("lens-title", long && "is-wrap")} style={long ? { fontSize: 34 } : undefined}>{title}</h1>;
 }

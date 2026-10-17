@@ -78,9 +78,9 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     return s;
   });
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useLayoutEffect(() => { stateRef.current = state; });
 
-  const [diag, setDiag] = useState<Diagnostics>({ provider: capture === "sample" ? "sample" : "claude", lastLatencyMs: null, inflight: null, frames: 0, additions: 0, logs: [], tapToFirstCardMs: null, listingTimings: [] });
+  const [diag, setDiag] = useState<Diagnostics>({ provider: "sample", lastLatencyMs: null, inflight: null, frames: 0, additions: 0, logs: [], tapToFirstCardMs: null, listingTimings: [] });
   const log = useCallback((line: string) => {
     onLog?.(line);
     setDiag((d) => ({ ...d, logs: [...d.logs.slice(-39), `${new Date().toISOString().slice(11, 19)} ${line}`] }));
@@ -88,24 +88,27 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
 
   const dispatch = useCallback((event: LensEvent) => rawDispatch(event), []);
 
-  // ── Capture adapter per source ──────────────────────────────────────────────
-  const pairCode = useRef<string | null>(null);
-  const adapterRef = useRef<CaptureAdapter>(createSampleAdapter());
+  // ── Capture adapter per source (memoized per capture kind; started/stopped in an effect) ──
+  // Pairing codes live in a module-level registry keyed by provider instance so the native adapter
+  // can read the latest code at capture time without touching React refs during render.
+  const [instanceId] = useState(() => `lens-${Math.random().toString(36).slice(2)}`);
+  const pairBox = useMemo(() => ({ get current() { return pairingCodes.get(instanceId) ?? null; } }), [instanceId]);
+  const adapter = useMemo<CaptureAdapter>(() => {
+    if (state.capture === "webcam") return createWebcamAdapter();
+    if (state.capture === "native") return createNativeAdapter(pairBox);
+    return createSampleAdapter();
+  }, [state.capture, pairBox]);
+  const adapterRef = useRef<CaptureAdapter>(adapter);
+  useLayoutEffect(() => { adapterRef.current = adapter; }, [adapter]);
   useEffect(() => {
-    adapterRef.current.stop();
-    if (state.capture === "webcam") adapterRef.current = createWebcamAdapter();
-    else if (state.capture === "native") adapterRef.current = createNativeAdapter(() => pairCode.current);
-    else adapterRef.current = createSampleAdapter();
-    setDiag((d) => ({ ...d, provider: state.capture === "sample" ? "sample" : "claude" }));
     if (state.capture !== "sample" && !fixture) {
-      adapterRef.current.start().catch((e) => {
+      adapter.start().catch((e) => {
         log(`capture start failed: ${(e as Error).message}`);
         dispatch({ type: "pairing/set", status: state.capture === "webcam" ? "denied" : "waiting" });
       });
     }
-    const a = adapterRef.current;
-    return () => a.stop();
-  }, [state.capture, fixture, dispatch, log]);
+    return () => adapter.stop();
+  }, [adapter, state.capture, fixture, dispatch, log]);
 
   // Pairing code (native source): restore or mint and register with the relay.
   useEffect(() => {
@@ -118,7 +121,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const res = await fetch("/api/relay/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
         const data = (await res.json()) as { code: string };
         if (cancelled) return;
-        pairCode.current = data.code;
+        pairingCodes.set(instanceId, data.code);
         localStorage.setItem(PAIR_KEY, JSON.stringify({ code: data.code, at: Date.now() }));
         dispatch({ type: "pairing/set", status: "waiting", code: data.code });
       } catch (e) {
@@ -127,16 +130,16 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
       }
     })();
     const poll = setInterval(async () => {
-      if (!pairCode.current) return;
+      if (!pairBox.current) return;
       try {
-        const r = await fetch(`/api/relay/status?code=${pairCode.current}`, { cache: "no-store" });
+        const r = await fetch(`/api/relay/status?code=${pairBox.current}`, { cache: "no-store" });
         const s = (await r.json()) as { phone: boolean; frameAgeMs: number | null };
         const status = !s.phone ? "waiting" : s.frameAgeMs === null ? "awaiting-camera" : s.frameAgeMs > 8000 ? "stale" : "connected";
         if (stateRef.current.pairing.status !== status) dispatch({ type: "pairing/set", status });
       } catch { /* keep last status */ }
     }, 2500);
     return () => { cancelled = true; clearInterval(poll); };
-  }, [state.capture, fixture, dispatch, log]);
+  }, [state.capture, fixture, dispatch, log, instanceId, pairBox]);
 
   // ── Persistence (saved offers, recipes, list only) ─────────────────────────
   const hydrated = useRef(false);
@@ -329,7 +332,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
       }
       case "handoff": {
         const absolute = effect.url.startsWith("/") ? `${window.location.origin}${effect.url}` : effect.url;
-        const code = pairCode.current;
+        const code = pairBox.current;
         if (!code && s.capture !== "native") {
           // Desktop/phone preview: open directly; label honestly.
           window.open(absolute, "_blank", "noopener,noreferrer");
@@ -554,14 +557,14 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
 
   const back = useCallback(() => dispatch({ type: "nav/back" }), [dispatch]);
 
-  const adapter = adapterRef.current;
   const sceneIndex = effectiveState.mode === "grocery" ? Math.max(0, effectiveState.grocery.frameIndex - 1) : effectiveState.mode === "glimpse" ? Math.max(0, effectiveState.glimpse.frameIndex - 1) : 0;
   const sceneUrl = adapter.sceneUrl(effectiveState.mode, sceneIndex);
   const sceneCaption = adapter.caption(effectiveState.mode, sceneIndex);
 
+  const diagnostics = useMemo(() => ({ ...diag, provider: effectiveState.capture === "sample" ? "sample" : "claude" }), [diag, effectiveState.capture]);
   const value = useMemo<LensContextValue>(() => ({
-    state: effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, diagnostics: diag, interactive: !fixture, fixture,
-  }), [effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, diag, fixture]);
+    state: effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, diagnostics, interactive: !fixture, fixture,
+  }), [effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, diagnostics, fixture]);
 
   return <LensContext.Provider value={value}>{children}</LensContext.Provider>;
 }
@@ -647,5 +650,7 @@ export function useLensInput(enabled = true) {
     return () => cancelAnimationFrame(raf);
   }, [enabled, actions, state.revision, state.screen, state.composer, lens.focusId, move, swipe, activate, select, focus, back]);
 }
+
+const pairingCodes = new Map<string, string | null>();
 
 const bridgeInstance = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `lens-${Date.now()}`;

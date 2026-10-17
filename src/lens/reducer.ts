@@ -223,6 +223,11 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
             grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: e.productKey, heldKey: null, heldLabel: null, heldSize: null };
             list = completeListFromCart(list, cart);
             toast = { text: `Added ${e.label}`, at: Date.now() };
+            // The camera confirmed the placement: the held-item card returns to the cart.
+            if (screen.id === "grocery-item" && screen.params?.productKey === e.productKey) {
+              screen = { id: "grocery" };
+              stack = stack.filter((s) => s.id !== "grocery");
+            }
           }
         } else if (e.type === "ask") {
           grocery = { ...grocery, pendingAsk: { eventId: e.eventId, productKey: e.productKey, label: e.label, packageSize: e.packageSize, priceCents: e.priceCents } };

@@ -1,21 +1,30 @@
 "use client";
 
 import clsx from "clsx";
-import { type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Lens } from "@/lens/Lens";
 import { useLens } from "@/lens/LensProvider";
 
 /** Where the simulated right-lens display sits within a 16:10 wearer scene. */
 export const DISPLAY_RECT = { x: 0.655, y: 0.13, width: 0.21, height: 0.336 } as const;
 
-/** Scales the fixed 600×600 lens into any square container. */
+/** Scales the fixed 600×600 lens into any square container (ResizeObserver; works in WKWebView too). */
 export function ScaledLens({ interactive, className, instant }: { interactive: boolean; className?: string; instant?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / 600);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className={clsx("relative aspect-square w-full overflow-hidden bg-black", className)}>
-      <div className="absolute inset-0" style={{ containerType: "inline-size" }}>
-        <div style={{ width: 600, height: 600, transformOrigin: "top left", transform: "scale(calc(100cqw / 600))" }}>
-          <Lens interactive={interactive} instant={instant} />
-        </div>
+    <div ref={ref} className={clsx("relative aspect-square w-full overflow-hidden bg-black", className)}>
+      <div style={{ width: 600, height: 600, transformOrigin: "top left", transform: `scale(${scale})`, position: "absolute", left: 0, top: 0 }}>
+        <Lens interactive={interactive} instant={instant} />
       </div>
     </div>
   );

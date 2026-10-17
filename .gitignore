@@ -25,3 +25,4 @@ ios/.build
 .vercel
 *.log
 measurements/*.local.json
+.env*

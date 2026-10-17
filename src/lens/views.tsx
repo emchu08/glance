@@ -538,8 +538,8 @@ function TripSummary() {
   if (!s) return <Center><p className="lens-sub">No trip yet</p></Center>;
   const total = s.segments.reduce((n, x) => n + x.cents, 0);
   const colors = ["#a9cdf5", "#6b6b6b", "#8a8a8a", "#a9a9a9", "#505050"];
-  let acc = 0;
   const r = 78, c = 2 * Math.PI * r;
+  const offsets = s.segments.reduce<number[]>((acc, seg) => [...acc, (acc[acc.length - 1] ?? 0) + seg.cents], []).map((end, i) => end - s.segments[i].cents);
   return (
     <div>
       <div className="lens-donut">
@@ -547,8 +547,7 @@ function TripSummary() {
           {s.segments.map((seg, i) => {
             const frac = total ? seg.cents / total : 0;
             const dash = `${frac * c} ${c}`;
-            const rot = (acc / Math.max(total, 1)) * 360 - 90;
-            acc += seg.cents;
+            const rot = (offsets[i] / Math.max(total, 1)) * 360 - 90;
             return <motion.circle key={seg.label} cx="100" cy="100" r={r} fill="none" stroke={seg.highlight ? colors[0] : colors[(i % 4) + 1]} strokeWidth="26" strokeDasharray={dash} transform={`rotate(${rot} 100 100)`} initial={state.reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.08 }} />;
           })}
           <text x="100" y="96" textAnchor="middle" fill="#fff" fontSize="30" fontWeight="700">{formatCents(s.thisTripCents)}</text>
@@ -624,7 +623,7 @@ function RecipeList() {
   if (g.recipesStatus === "loading") return <Center><Spinner /><p className="lens-sub">Writing three recipes…</p></Center>;
   if (g.recipesStatus === "error") return <Center><p className="lens-eyebrow">Couldn’t get recipes</p><p className="lens-sub is-wrap">{g.error}</p></Center>;
   if (g.recipesStatus === "empty" || !g.recipes.length) return <Center><p className="lens-sub is-wrap">No recipes for this dish yet.</p></Center>;
-  return <><p className="lens-sub">Make something like the dish you saw</p><Rows /></>;
+  return <><p className="lens-sub">Like {state.gourmet.dish ?? "the dish you saw"}</p><Rows /></>;
 }
 
 function RecipeDetail() {
