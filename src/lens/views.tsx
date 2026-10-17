@@ -688,7 +688,7 @@ function WalletTray() {
   }
   return (
     <Center>
-      <div className="lens-badge is-pay" style={{ background: "transparent", border: "3px solid rgba(99,91,255,0.8)", color: "#c9c5ff" }}>•••</div>
+      <div className="lens-badge is-pay" style={{ background: "transparent", border: "3px solid rgba(169,205,245,0.8)", color: "#a9cdf5" }}>•••</div>
       <h2 className="lens-title is-wrap" style={{ fontSize: 34 }}>{w.status === "signed-out" ? "Sign in to use your wallet" : w.status === "not-ready" ? "No saved card yet" : "Checking your wallet…"}</h2>
       <p className="lens-sub is-wrap">One-time setup happens on your phone. Card details stay with Stripe.</p>
     </Center>

@@ -1,88 +1,176 @@
 import SwiftUI
 import WebKit
 
-struct GlanceTab: View {
+/// The same live WKWebView remains interactive on the phone while driving glasses.
+struct LauncherView: View {
     @Environment(AppModel.self) private var model
-    @State private var code = ""
+    private let blue = Color(red: 0.16, green: 0.39, blue: 0.91)
+
     var body: some View {
         @Bindable var model = model
-        NavigationStack {
-            Form {
-                Section("Lens camera") {
-                    LensCameraCard()
-                    Picker("Source", selection: $model.cameraSource) { ForEach(CameraSource.allCases) { Text($0.rawValue).tag($0) } }
-                    Text("One camera, all modes: the lens decides when to analyze. Nothing is sent while you read an offer.").font(.footnote).foregroundStyle(.secondary)
-                }
-                if model.capabilities.display {
-                    Section("Glasses") { Text("Mirroring the lens to the right display · rev \(model.lensBridge.deliveredRevision)") }
-                }
-                Section("Connection") {
-                    LabeledContent("Glasses", value: model.connection.label)
-                    if !model.connection.recovery.isEmpty { Text(model.connection.recovery).font(.footnote).foregroundStyle(.secondary) }
-                    Button(model.connection == .idle ? "Connect glasses" : "Reconnect") { Task { await model.connectGlasses() } }
-                    DisclosureGroup("Pair with the lens") {
-                        TextField("6-character code", text: $code).textInputAutocapitalization(.characters).autocorrectionDisabled()
-                        Button("Pair") { Task { await model.pair(code: code) } }.disabled(code.count != 6)
-                        LabeledContent("Relay", value: model.relayStatus)
-                        if !model.pairingCode.isEmpty { Button("Disconnect", role: .destructive) { model.disconnectRelay() } }
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Label("Glance", systemImage: "eyeglasses")
+                            .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        Spacer()
+                        Button { model.showWallet = true } label: {
+                            Label("Wallet", systemImage: "wallet.bifold")
+                                .font(.headline).padding(.vertical, 12).padding(.horizontal, 16)
+                                .background(blue.opacity(0.09), in: Capsule())
+                        }.accessibilityIdentifier("phone-wallet")
+                    }.foregroundStyle(blue)
+                    HStack {
+                        Text("Your glasses view").font(.headline)
+                        Spacer()
+                        Label(model.connection == .sessionActive ? "Connected" : "Phone preview", systemImage: model.connection == .sessionActive ? "link" : "iphone")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                }
-                Section("From your glasses") {
-                    if model.history.isEmpty { Text("Links you send from the lens appear here.").foregroundStyle(.secondary) }
-                    ForEach(model.history) { link in
-                        if let url = URL(string: link.url) { Link(destination: url) { VStack(alignment: .leading) { Text(link.title); Text(link.kind.capitalized).font(.caption).foregroundStyle(.secondary) } } }
+                    LensRuntimeView()
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .accessibilityIdentifier("live-lens")
+                    LensActivityView(bridge: model.lensBridge)
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        let fresh = model.lensBridge.lastFrameAt.map { context.date.timeIntervalSince($0) < 2 } ?? false
+                        Label(fresh ? "Glasses camera connected" : "Glasses camera not connected", systemImage: fresh ? "video.fill" : "video.slash")
+                            .font(.footnote).foregroundStyle(blue)
                     }
+                    if let error = model.errorMessage {
+                        Text(error).font(.callout).foregroundStyle(.primary).accessibilityIdentifier("connection-error")
+                    }
+                    if model.connection != .sessionActive || model.isLaunching || model.errorMessage != nil {
+                        Text(model.launchStatus).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("launch-status")
+                        Button { Task { await model.openGlance() } } label: {
+                            HStack {
+                                if model.isLaunching { ProgressView().tint(.white) }
+                                Text(model.isLaunching ? "Connecting…" : "Connect glasses").font(.headline)
+                            }
+                            .frame(maxWidth: .infinity).frame(height: 54)
+                            .foregroundStyle(.white).background(blue, in: Capsule())
+                        }.disabled(model.isLaunching).accessibilityIdentifier("open-glance")
+                    }
+                    Text("Tap the view to use Glance here. On glasses, navigate to the outlined button, then select. Keep this app open.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
-                Section("Developer tools") {
-                    NavigationLink("Lens preview (WKWebView)") { LensPreview() }
-                    LabeledContent("API", value: model.apiBase.absoluteString)
-                    LabeledContent("Transport", value: model.transport.name)
-                    NavigationLink("Log") { List(model.developerLog.reversed(), id: \.self) { Text($0).font(.system(.caption, design: .monospaced)) } }
-                }
+                .padding(20)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
             }
-            .navigationTitle("Glance")
+        }
+        .background(LinearGradient(colors: [.white, Color(red: 0.92, green: 0.96, blue: 1)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
+        .preferredColorScheme(.light)
+        .sheet(isPresented: $model.showWallet, onDismiss: { model.lensBridge.walletReturned() }) {
+            WalletView()
         }
     }
 }
 
-struct LensCameraCard: View {
-    @Environment(AppModel.self) private var model
+private struct LensActivityView: View {
+    @ObservedObject var bridge: LensBridge
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack { Image(systemName: "camera.viewfinder"); Text(model.cameraSource.rawValue).font(.headline) }
-            Text(model.lastFrameAt.map { "Last frame \($0.formatted(date: .omitted, time: .standard))" } ?? "No frames sent yet").font(.footnote).foregroundStyle(.secondary)
-            Button("Start camera") { Task { try? await model.transport.startCamera() } }.buttonStyle(.borderedProminent)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(bridge.activityTitle).font(.headline)
+            Text(bridge.activityDetail).font(.callout).foregroundStyle(.secondary)
+        }.accessibilityElement(children: .combine).accessibilityIdentifier("lens-activity")
+    }
+}
+
+struct LensRuntimeView: UIViewRepresentable {
+    @Environment(AppModel.self) private var model
+    func makeUIView(context: Context) -> ScaledLensContainer {
+        ScaledLensContainer(webView: model.lensBridge.makeWebView(url: Config.lensURL))
+    }
+    func updateUIView(_ uiView: ScaledLensContainer, context: Context) {}
+}
+
+final class ScaledLensContainer: UIView {
+    let webView: WKWebView
+    init(webView: WKWebView) {
+        self.webView = webView
+        super.init(frame: .zero)
+        backgroundColor = .black
+        clipsToBounds = true
+        addSubview(webView)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        webView.transform = .identity
+        webView.frame = CGRect(x: 0, y: 0, width: 600, height: 600)
+        webView.transform = CGAffineTransform(scaleX: bounds.width / 600, y: bounds.width / 600)
+        webView.frame.origin = .zero
+    }
+}
+
+private struct WalletView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var loading = true
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                WalletWebView(onReturn: { dismiss() }, onLoading: { loading = $0 }).ignoresSafeArea(edges: .bottom)
+                if loading { ProgressView("Loading wallet…").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16)) }
+            }
+                .navigationTitle("Wallet").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("wallet-done") } }
         }
     }
 }
 
-struct LensPreview: UIViewRepresentable {
-    @Environment(AppModel.self) private var model
-    func makeUIView(context: Context) -> WKWebView { model.lensBridge.makeWebView(url: model.apiBase.appending(path: "/lens")) }
+private struct WalletWebView: UIViewRepresentable {
+    let onReturn: () -> Void
+    let onLoading: (Bool) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(onReturn: onReturn, onLoading: onLoading) }
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        // The lens and wallet must share authentication/Stripe cookies.
+        config.websiteDataStore = .default()
+        let theme = """
+        const style = document.createElement('style');
+        style.textContent = `:root { color-scheme: light; background: white;
+          --color-canvas: #fff; --color-surface: #eef5ff; --color-raised: #dae8ff;
+          --color-fg: #173d78; --color-muted: #4d6385; --color-subtle: #586b88;
+          --color-wearer: #2864e8; --color-best: #2864e8; --color-warn: #17418b; --color-saved: #17418b; }
+          main li, input, select { border-color: #bcd0ef !important; }
+          a[href="/demo"] { display: none !important; }`;
+        document.head.appendChild(style);
+        const fixLinks = () => document.querySelectorAll('a[href="/glasses"]').forEach(a => { a.href = '/lens'; a.textContent = 'Return to Glance'; });
+        new MutationObserver(fixLinks).observe(document.body, {childList: true, subtree: true}); fixLinks();
+        """
+        config.userContentController.addUserScript(WKUserScript(source: theme, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
+        webView.load(URLRequest(url: Config.apiBase.appending(path: "/wallet/setup")))
+        return webView
+    }
     func updateUIView(_ uiView: WKWebView, context: Context) {}
-}
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        let onReturn: () -> Void
+        let onLoading: (Bool) -> Void
+        init(onReturn: @escaping () -> Void, onLoading: @escaping (Bool) -> Void) { self.onReturn = onReturn; self.onLoading = onLoading }
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { onLoading(true) }
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { onLoading(false) }
 
-struct SettingsTab: View {
-    @Environment(AppModel.self) private var model
-    @State private var apiBase: String = Config.apiBase.absoluteString
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Server") {
-                    TextField("API base", text: $apiBase).keyboardType(.URL).autocorrectionDisabled().textInputAutocapitalization(.never)
-                    Text("Keep the phone and lens on the same origin. Production builds use the deployed HTTPS origin.").font(.footnote).foregroundStyle(.secondary)
-                }
-                Section("Wallet") {
-                    Link("Open wallet setup", destination: model.apiBase.appending(path: "/wallet/setup"))
-                    Text("Card details stay with Stripe. Purchases happen on the glasses; your bank may occasionally ask to verify here.").font(.footnote).foregroundStyle(.secondary)
-                }
-                Section("Privacy") {
-                    Link("Privacy", destination: model.apiBase.appending(path: "/privacy"))
-                    Link("Terms", destination: model.apiBase.appending(path: "/terms"))
-                    Text("Camera frames are transient (20 s on the relay) and never saved to your account.").font(.footnote).foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle("Settings")
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+            guard navigationAction.targetFrame?.isMainFrame != false else { return .allow }
+            guard let url = navigationAction.request.url else { return .cancel }
+            if url.absoluteString == "about:blank" { return .allow }
+            guard url.scheme == "https" else { return .cancel }
+            // Wallet/auth pages may use Stripe/bank verification. Never navigate to a legacy runtime.
+            if url.host == Config.apiBase.host, ["/", "/demo", "/glasses", "/lens"].contains(url.path) { onReturn(); return .cancel }
+            if url.host == "glance-website-lac.vercel.app" { return .cancel }
+            return .allow
+        }
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if navigationAction.targetFrame == nil { webView.load(navigationAction.request) }
+            return nil
+        }
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            onLoading(false)
+            webView.loadHTMLString("<meta name='viewport' content='width=device-width,initial-scale=1'><body style='font:18px system-ui;padding:24px;color:#17418b'><h2>Wallet couldn’t load</h2><p>Check your connection, then close and reopen Wallet.</p></body>", baseURL: nil)
         }
     }
 }
