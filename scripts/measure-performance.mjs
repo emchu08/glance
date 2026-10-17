@@ -14,7 +14,13 @@ if (!chromium) {
   console.log("Playwright not found. Install it in website/ (npm ci) or run with Chrome DevTools → Performance. Record median, p95/p99 frame intervals, dropped frames.");
   process.exit(0);
 }
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined });
+let browser;
+try { browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined }); }
+catch (e) {
+  console.log("Could not launch a browser:", String(e.message).split("\n")[0]);
+  console.log("Run `cd website && npx playwright install chromium` (downloads a browser), or set CHROME_PATH to an installed Chrome, then re-run.");
+  process.exit(0);
+}
 const results = [];
 for (const p of pages) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
