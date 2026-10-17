@@ -1,6 +1,6 @@
 # Glance — Buy with your eyes
 
-An AI shopping assistant for Meta display glasses. Look at a product, compare an accurate offer, and buy eligible
+A search engine for the physical world, meant for Meta display glasses. Look at a product, compare an accurate offer, and buy eligible
 items with a saved Visa card through Stripe, right inside a 600×600 lens. Three modes, one wallet:
 
 - **Glimpse** (light blue) — scan what you see → offers → `Buy $X`
