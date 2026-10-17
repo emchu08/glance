@@ -1,0 +1,54 @@
+{
+  "name": "glance",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "postinstall": "node scripts/copy-mediapipe-wasm.mjs",
+    "dev:https": "next dev --experimental-https --hostname 0.0.0.0",
+    "test:vision": "node scripts/test-vision.mjs",
+    "test:grocery": "node scripts/test-grocery.mjs",
+    "test": "node --test --import ./tests/register-hooks.mjs tests/*.test.ts",
+    "test:e2e": "node --test tests/e2e/glimpse.mjs",
+    "test:e2e:live": "GLANCE_LIVE_E2E=1 node --test tests/e2e/glimpse.mjs",
+    "measure:listings": "node scripts/measure-listings.mjs",
+    "measure:performance": "node scripts/measure-performance.mjs",
+    "warm:listings": "node scripts/warm-listings.mjs",
+    "seed:sandbox": "node --import ./tests/register-hooks.mjs scripts/seed-sandbox.ts",
+    "db:migrate": "node scripts/db-migrate.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@mediapipe/tasks-vision": "^1.1.1",
+    "@stripe/react-stripe-js": "^7.0.0",
+    "@stripe/stripe-js": "^10.1.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
+    "@vercel/functions": "^3.10.1",
+    "clsx": "^2.1.1",
+    "geist": "^1.8.1",
+    "lucide-react": "^1.59.0",
+    "motion": "^14.3.0",
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "stripe": "^23.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.13.0",
+    "eslint-config-next": "16.4.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

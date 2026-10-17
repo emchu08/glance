@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Shopping cart placeholder">
+  <rect width="1600" height="1000" fill="#eceae4"/>
+  <polygon points="0,1000 1600,1000 1300,300 300,300" fill="#d2cec6"/>
+  <g fill="none" stroke="#8d8f96" stroke-width="10">
+    <path d="M250 980 L380 420 L1220 420 L1350 980"/>
+    <line x1="380" y1="420" x2="250" y2="980"/><line x1="464" y1="420" x2="360" y2="980"/><line x1="548" y1="420" x2="470" y2="980"/><line x1="632" y1="420" x2="580" y2="980"/><line x1="716" y1="420" x2="690" y2="980"/><line x1="800" y1="420" x2="800" y2="980"/><line x1="884" y1="420" x2="910" y2="980"/><line x1="968" y1="420" x2="1020" y2="980"/><line x1="1052" y1="420" x2="1130" y2="980"/><line x1="1136" y1="420" x2="1240" y2="980"/><line x1="1220" y1="420" x2="1350" y2="980"/>
+    <line x1="380" y1="420" x2="1220" y2="420"/><line x1="354" y1="532" x2="1246" y2="532"/><line x1="328" y1="644" x2="1272" y2="644"/><line x1="302" y1="756" x2="1298" y2="756"/><line x1="276" y1="868" x2="1324" y2="868"/><line x1="250" y1="980" x2="1350" y2="980"/>
+  </g>
+  <rect x="560" y="560" width="190" height="230" rx="30" fill="#f6f1e6"/><rect x="580" y="560" width="150" height="50" rx="20" fill="#3f8fd6"/>
+  <rect x="820" y="600" width="150" height="190" rx="24" fill="#e2534a"/>
+  <ellipse cx="700" cy="860" rx="140" ry="40" fill="#e8c94f"/>
+  <text x="24" y="980" font-family="system-ui" font-size="24" fill="#1b1b1f" opacity="0.7">Placeholder scene · procedural · scripted observations</text>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Black backpack placeholder">
+  <rect width="800" height="1000" fill="#f2f2f4"/>
+  <rect x="180" y="200" width="440" height="620" rx="110" fill="#17181c"/>
+  <rect x="220" y="240" width="360" height="150" rx="50" fill="#26272d"/>
+  <rect x="200" y="420" width="400" height="14" rx="7" fill="#3a3b42"/>
+  <rect x="230" y="620" width="340" height="150" rx="40" fill="#222329"/>
+  <rect x="260" y="140" width="60" height="120" rx="30" fill="#1f2026"/><rect x="480" y="140" width="60" height="120" rx="30" fill="#1f2026"/>
+</svg>

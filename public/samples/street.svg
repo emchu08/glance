@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" role="img" aria-label="Street scene placeholder: cobblestone street with a person wearing a gray sweater and black backpack">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8dbdef"/><stop offset="1" stop-color="#e7f0fa"/></linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a9aa0"/><stop offset="1" stop-color="#6e6e75"/></linearGradient>
+  </defs>
+  <rect width="1600" height="1200" fill="url(#sky)"/>
+  <ellipse cx="1400" cy="520" rx="420" ry="90" fill="#6f9b6a" opacity="0.8"/>
+  <ellipse cx="300" cy="540" rx="380" ry="80" fill="#7fa876" opacity="0.7"/>
+  <polygon points="0,1200 1600,1200 1100,560 520,560" fill="url(#road)"/>
+  <g fill="none" stroke="#5c5c63" stroke-width="3" opacity="0.5"><line x1="520" y1="560" x2="1100" y2="560"/><line x1="482" y1="606" x2="1136" y2="606"/><line x1="444" y1="652" x2="1172" y2="652"/><line x1="406" y1="698" x2="1208" y2="698"/><line x1="368" y1="744" x2="1244" y2="744"/><line x1="330" y1="790" x2="1280" y2="790"/><line x1="292" y1="836" x2="1316" y2="836"/><line x1="254" y1="882" x2="1352" y2="882"/><line x1="216" y1="928" x2="1388" y2="928"/><line x1="178" y1="974" x2="1424" y2="974"/><line x1="140" y1="1020" x2="1460" y2="1020"/><line x1="102" y1="1066" x2="1496" y2="1066"/><line x1="64" y1="1112" x2="1532" y2="1112"/><line x1="26" y1="1158" x2="1568" y2="1158"/></g>
+  <!-- left facades -->
+  <rect x="0" y="300" width="520" height="700" fill="#f4f1ea"/><rect x="0" y="700" width="520" height="300" fill="#2f5fb3"/>
+  <rect x="120" y="640" width="90" height="200" fill="#e0b84a"/><rect x="300" y="420" width="90" height="140" fill="#dfe6ef"/>
+  <!-- right facades -->
+  <rect x="1100" y="320" width="500" height="680" fill="#3d7bd6"/><rect x="1240" y="320" width="200" height="680" fill="#f3a58f"/><rect x="1440" y="320" width="160" height="680" fill="#f3ebd2"/>
+  <rect x="1100" y="290" width="500" height="40" fill="#b55a3c"/>
+  <!-- small pedestrian with red shoulder bag at (0.28,0.55,0.05,0.1) -->
+  <g><rect x="455" y="610" width="70" height="170" rx="20" fill="#5a6270"/><circle cx="490" cy="590" r="28" fill="#c9a07a"/><rect x="448" y="660" width="80" height="120" rx="14" fill="#c8243a"/></g>
+  <!-- main back-facing person: gray sweater (0.43,0.56,0.2,0.3) + backpack (0.46,0.6,0.13,0.24) -->
+  <g>
+    <rect x="688" y="672" width="320" height="360" rx="60" fill="#c9c9cc"/>
+    <rect x="688" y="700" width="320" height="300" rx="40" fill="#d4d4d7"/>
+    <circle cx="848" cy="610" r="70" fill="#6b4a36"/><rect x="790" y="640" width="116" height="90" rx="30" fill="#6b4a36"/>
+    <rect x="736" y="720" width="208" height="288" rx="44" fill="#141518"/>
+    <rect x="760" y="740" width="160" height="60" rx="18" fill="#2a2b30"/>
+    <rect x="742" y="820" width="196" height="8" fill="#333"/>
+    <rect x="700" y="1030" width="120" height="170" fill="#2f3a55"/><rect x="876" y="1030" width="120" height="170" fill="#2f3a55"/>
+  </g>
+  <text x="24" y="1180" font-family="system-ui" font-size="26" fill="#1b1b1f" opacity="0.75">Placeholder scene · procedural · replace with licensed photo</text>
+</svg>

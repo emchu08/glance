@@ -1,0 +1,27 @@
+# dependencies
+node_modules
+website/node_modules
+# builds
+.next
+out
+website/dist
+*.tsbuildinfo
+next-env.d.ts
+# generated runtime assets (reproduced by `npm install` / model setup)
+public/mediapipe/wasm
+public/models/*.tflite
+# env
+.env
+.env.local
+.env.*.local
+website/.env.local
+# native
+ios/DerivedData
+ios/*.xcodeproj/xcuserdata
+ios/*.xcworkspace/xcuserdata
+ios/.build
+# misc
+.DS_Store
+.vercel
+*.log
+measurements/*.local.json
