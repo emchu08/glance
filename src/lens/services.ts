@@ -163,7 +163,7 @@ async function readNdjson(body: ReadableStream<Uint8Array>, emit: (offers: Offer
         const next: Offer = { ...current, ...(msg.imageUrl !== undefined ? { imageUrl: msg.imageUrl } : {}), ...(msg.priceCents !== undefined ? { priceCents: msg.priceCents } : {}) };
         all = all.map((o) => (o.id === msg.id ? next : o));
         emit([next], false);
-      } else {
+      } else if ((msg.type === "ranked" || msg.type === "done") && Array.isArray(msg.offers)) {
         all = msg.offers;
         emit(all, true);
       }

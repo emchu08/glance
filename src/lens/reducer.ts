@@ -309,6 +309,8 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       if (current && current.status === event.status && event.data === undefined) return state;
       return bump({ ...state, grocery: { ...state.grocery, insights: { ...state.grocery.insights, [event.productKey]: { status: event.status, data: event.data ?? current?.data ?? null } }, nudgedKeys: state.grocery.nudgedKeys.includes(event.productKey) ? state.grocery.nudgedKeys : [...state.grocery.nudgedKeys, event.productKey] } });
     }
+    case "grocery/online":
+      return bump({ ...state, grocery: { ...state.grocery, online: { ...state.grocery.online, [event.productKey]: { status: event.status, offers: event.offers } } } });
     case "grocery/finish": {
       if (state.grocery.cart.length === 0) return state;
       const summary = buildTripSummary(state.grocery.cart, state.grocery.bought.reduce((s, b) => s + b.priceCents, 0));

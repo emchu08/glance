@@ -49,7 +49,7 @@ const fs = require('node:fs');
     await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Start scan, then hold an item up.'));
     assert.equal(await page.locator('.glance-native-activity').count(), 0, 'No injected banner');
     await page.locator('[data-action-id="scan"]').click();
-    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Scanning every 3 s'));
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Scanning for items'));
     let text = await lensText();
     assert.equal(count(text, 'Hold an item up'), 1, 'Instruction appears once');
     assert.ok(!/Scanning is on/.test(text), 'No repeated scanning status');
@@ -68,25 +68,25 @@ const fs = require('node:fs');
     await page.evaluate(() => window.glanceCompanion.camera({ ready: true }));
 
     await page.locator('[data-action-id="scan"]').click();
-    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Scan paused'));
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Scanning paused'));
     await page.evaluate(() => window.glanceBridge.setActive('scan'));
-    await page.waitForFunction(() => document.querySelector('[data-action-id="scan"]')?.classList.contains('is-focused'));
-    const ring = await page.locator('[data-action-id="scan"]').evaluate(el => ({ inset: getComputedStyle(el, '::after').top, border: getComputedStyle(el, '::after').borderTopColor, fill: getComputedStyle(el).backgroundColor, rect: el.getBoundingClientRect().toJSON() }));
-    assert.equal(ring.inset, '0px', 'Focus ring sits on the pill edge, inside its clip');
-    assert.equal(ring.border, 'rgb(255, 255, 255)', 'Selection is a white outline');
+    await page.waitForFunction(() => document.querySelector('[data-action-id="scan"]')?.hasAttribute('data-focused'));
+    const ring = await page.locator('[data-action-id="scan"]').evaluate(el => {
+      const r = el.querySelector('[data-focus-ring]');
+      return { ring: !!r, shadow: r ? getComputedStyle(r).boxShadow : '', fill: getComputedStyle(el).backgroundColor, rect: (r ?? el).getBoundingClientRect().toJSON() };
+    });
+    assert.ok(ring.ring, 'The focused control carries the focus ring');
+    assert.ok(/rgb\(255, 255, 255\)/.test(ring.shadow), 'Selection is a white ring');
     assert.ok(!/rgb\(255, 255, 255\)/.test(ring.fill), 'Selection is never a solid white block on the glasses');
-    assert.ok(ring.rect.bottom <= 600);
+    assert.ok(ring.rect.bottom <= 600 && ring.rect.top >= 0, 'Ring stays on the display');
     await page.screenshot({ path: '/tmp/glance-grocery-paused-focus.png' });
 
-    // Listing search: error and empty states come from the lens itself.
-    await page.locator('[data-action-id="hdr-modes"]').click();
-    await page.locator('[data-action-id="mode-glimpse"]').click();
-    await page.locator('[data-action-id="more"]').click();
-    await page.locator('[data-action-id="m-listings"]').click();
-    await page.locator('[data-action-id="search"]').click();
-    await page.locator('[data-action-id="key-a"]').click();
-    await page.locator('[data-action-id="key-done"]').click();
-    await page.locator('[data-action-id="go"]').click();
+    // Listing search (the top bar's search, once there's an item): error and empty states come from the lens itself.
+    await page.locator('[data-action-id="add"]').click();
+    await page.locator('[data-action-id^="manual-"]:not([data-action-id="manual-type"])').first().click();
+    await page.waitForSelector('[data-screen="grocery"] [data-action-id^="line-"]');
+    await page.locator('[data-action-id="hdr-search"]').click();
+    await page.waitForSelector('[data-screen="online-listings"]');
     for (let i = 0; i < 50 && !listingRequest; i += 1) await page.waitForTimeout(100);
     assert.ok(listingRequest);
     await listingRequest.fulfill({ status: 503, json: { error: 'test unavailable' } }); listingRequest = null;
@@ -98,7 +98,7 @@ const fs = require('node:fs');
 
     await page.locator('[data-action-id="hdr-wallet"]').click();
     await page.locator('[data-action-id="w-setup"]').click();
-    assert.ok(await page.evaluate(() => window.nativeMessages.some(m => m.type === 'wallet')), 'Wallet handoff opens the phone sheet');
+    await page.waitForFunction(() => window.nativeMessages.some(m => m.type === 'wallet'), null, { timeout: 5000 }).catch(() => assert.fail('Wallet handoff opens the phone sheet'));
     assert.deepEqual(errors, []);
     console.log('PASS: opens on the picker with no intro, no pair code, camera status in the lens, Grocery says each thing once, camera-drop message, fresh native capture, pause, visible focus ring, listing error/empty, wallet handoff, no browser errors.');
   } finally { await browser.close(); }

@@ -7,7 +7,7 @@ import type { CaptureKind, Offer } from "@/data/types";
 import { createNativeAdapter, createSampleAdapter, createWebcamAdapter, type CaptureAdapter } from "./capture";
 import { moveFocus, moveLinear, reconcileFocus, type Direction } from "./navigation";
 import { initialState, lensReducer } from "./reducer";
-import { describeScreen, isPayable } from "./screens";
+import { describeScreen, groceryQuery, isPayable } from "./screens";
 import { loadPersisted, savePersisted, PAIR_KEY } from "./storage";
 import * as svc from "./services";
 import type { LensAction, LensEffect, LensEvent, LensState, OrderSummary } from "./types";
@@ -37,6 +37,8 @@ export interface LensContextValue {
   runEffect: (effect: LensEffect) => void;
   sceneUrl: string | null;
   sceneCaption: string | null;
+  /** The frame the last Glimpse scan analysed (its candidates' boxes are in this image). */
+  snapshot: string | null;
   diagnostics: Diagnostics;
   interactive: boolean;
   fixture: boolean;
@@ -228,6 +230,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
   };
   const lastNativeFrameAt = useRef(0);
   const lastFrame = useRef<svc.Frame | null>(null);
+  const [snapshot, setSnapshot] = useState<string | null>(null);
   const purchaseInFlight = useRef<string | null>(null);
 
   const runEffect = useCallback((effect: LensEffect) => {
@@ -258,6 +261,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
             lastFrame.current = frame;
             const r = await timed("glimpse", () => svc.recognizeGlimpse(frame, s.glimpse.seenWindow, c.signal));
             if (!stillCurrent() || c.signal.aborted) return;
+            setSnapshot(frame.dataUrl ?? null);
             dispatch({ type: "glimpse/scan-result", scanId, candidates: r.ranked, frameIndex: (s.glimpse.frameIndex + 1) % 3 });
           } catch (e) {
             if (c.signal.aborted) return;
@@ -335,6 +339,21 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
             dispatch({ type: "grocery/insight", productKey: effect.productKey, status: "error", data: null });
           }
         })();
+        break;
+      }
+      case "grocery-online": {
+        // Live prices for a held item: the same grounded listing search, kept per item.
+        if (s.capture === "sample" || s.grocery.online?.[effect.productKey]) break;
+        dispatch({ type: "grocery/online", productKey: effect.productKey, status: "loading", offers: [] });
+        const c = begin(`online:${effect.productKey}`);
+        svc.searchListings(effect.query, (offers, done, replace) => {
+          if (!stillCurrent() || c.signal.aborted) return;
+          const prev = stateRef.current.grocery.online?.[effect.productKey]?.offers ?? [];
+          const merged = replace ? offers : [...prev.filter((o) => !offers.some((n) => n.id === o.id)), ...offers];
+          dispatch({ type: "grocery/online", productKey: effect.productKey, status: done ? (merged.length ? "ready" : "empty") : "loading", offers: merged });
+        }, c.signal).catch(() => {
+          if (!c.signal.aborted) dispatch({ type: "grocery/online", productKey: effect.productKey, status: "error", offers: stateRef.current.grocery.online?.[effect.productKey]?.offers ?? [] });
+        });
         break;
       }
       case "grocery-exit":
@@ -523,10 +542,11 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
 
   // Held-item card: request insight once per item.
   useEffect(() => {
-    if (effectiveState.screen.id !== "grocery-item") return;
+    if (effectiveState.screen.id !== "grocery-item" && effectiveState.screen.id !== "grocery-compare") return;
     const key = String(effectiveState.screen.params?.productKey ?? "");
     if (!key) return;
     runEffect({ kind: "grocery-insight", productKey: key, label: effectiveState.grocery.heldLabel ?? key, packageSize: effectiveState.grocery.heldSize });
+    runEffect({ kind: "grocery-online", productKey: key, query: groceryQuery(stateRef.current, key) });
   }, [effectiveState.screen, effectiveState.grocery.heldLabel, effectiveState.grocery.heldSize, runEffect]);
 
   // Wallet status as soon as the lens opens.
@@ -581,7 +601,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     if (cur) activate(cur);
   }, [activate]);
 
-  const back = useCallback(() => dispatch({ type: "nav/back" }), [dispatch]);
+  // Back does what the top bar's Back does (at a mode's root that's the picker).
+  const back = useCallback(() => (actions.some((a) => a.id === "hdr-back") ? activate("hdr-back") : dispatch({ type: "nav/back" })), [actions, activate, dispatch]);
 
   const sceneIndex = effectiveState.mode === "grocery" ? Math.max(0, effectiveState.grocery.frameIndex - 1) : effectiveState.mode === "glimpse" ? Math.max(0, effectiveState.glimpse.frameIndex - 1) : 0;
   const sceneUrl = adapter.sceneUrl(effectiveState.mode, sceneIndex);
@@ -589,8 +610,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
 
   const diagnostics = useMemo(() => ({ ...diag, provider: effectiveState.capture === "sample" ? "sample" : "claude" }), [diag, effectiveState.capture]);
   const value = useMemo<LensContextValue>(() => ({
-    state: effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, diagnostics, interactive: !fixture, fixture,
-  }), [effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, diagnostics, fixture]);
+    state: effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, snapshot, diagnostics, interactive: !fixture, fixture,
+  }), [effectiveState, actions, focusId, dispatch, activate, focus, move, swipe, select, back, runEffect, sceneUrl, sceneCaption, snapshot, diagnostics, fixture]);
 
   return <LensContext.Provider value={value}>{children}</LensContext.Provider>;
 }

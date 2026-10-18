@@ -1,207 +1,77 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, ShoppingBag } from "lucide-react";
 import { motion } from "motion/react";
-import { type ReactNode } from "react";
-import { CATALOG_BY_ID, HOME_STORE, STORES } from "@/data/grocery";
-import type { Offer } from "@/data/types";
+import {
+  AlertCircle, AlertTriangle, ArrowUp, Bookmark, BookmarkCheck, Check, ChevronDown, CircleCheck, CornerUpLeft, CornerUpRight, Delete,
+  ListChecks, LocateFixed, MapPin, Minus, Navigation, Plus, Receipt, ScanLine, ShoppingBag, ShoppingCart, Smartphone, Sparkles, Undo2, UtensilsCrossed, Wallet,
+} from "lucide-react";
+import type { ReactNode } from "react";
+import { CATALOG_BY_ID, GROCERY_CATALOG, HOME_STORE, STORES } from "@/data/grocery";
+import type { NormalizedBox, Offer } from "@/data/types";
 import { cartTotals } from "@/domain/grocery/cart";
 import { aisleStops, homeStoreStock } from "@/domain/grocery/list";
+import { storesByDistance } from "@/domain/grocery/stores";
 import { formatAmounts, paginateSteps, scaleIngredients } from "@/domain/gourmet/list";
 import { formatCents } from "@/domain/money";
 import { useLens } from "./LensProvider";
-import { LIST_WINDOW } from "./reducer";
-import { COMPOSER_KEYS, currentOffer, isPayable, visibleWindow } from "./screens";
-import { type LensAction, type LensState } from "./types";
+import { compareOffers, currentOffer, groceryOnline, isPayable, payingFor } from "./screens";
+import type { LensState } from "./types";
+import {
+  Act, AMBER, BLUE, BottomRow, CardButtons, CardSkeleton, Center, Eyebrow, FrameCrop, LensField, OfferCard, OfferPhoto, Pill, RowList, Spinner,
+  SUCCESS_GREEN, useAction, type CardLayout,
+} from "./ui";
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Shared primitives
-// ──────────────────────────────────────────────────────────────────────────────
-
-function Rows({ render, filter }: { render?: (a: LensAction, i: number) => ReactNode; filter?: (a: LensAction) => boolean }) {
-  const { actions, focusId, activate, state } = useLens();
-  const list = actions.filter((a) => a.listIndex !== undefined && (filter ? filter(a) : true)).sort((a, b) => a.listIndex! - b.listIndex!);
-  const { start, end } = visibleWindow(list, state.windowStart);
-  const visible = list.slice(start, end);
-  return (
-    <div className="lens-rows" role="list">
-      {visible.map((a) => (
-        <button key={a.id} type="button" role="listitem" className={clsx("lens-row", focusId === a.id && "is-focused", a.variant === "row" && a.hint && (a.hint === "checked" || a.hint === "unchecked") && "has-check")} data-action-id={a.id} onClick={() => activate(a.id)} disabled={a.disabled}>
-          {render ? render(a, a.listIndex!) : (
-            <>
-              <div className="lens-row-main">
-                <div className="lens-row-label">{a.label}</div>
-                {a.hint && <div className="lens-row-hint">{a.hint}</div>}
-              </div>
-            </>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Position({ count, index, note }: { count: number; index?: number; note?: ReactNode }) {
-  const { state, actions, focusId, activate } = useLens();
-  if (index !== undefined) {
-    const prev = actions.find((a) => a.id === "offer-prev");
-    const next = actions.find((a) => a.id === "offer-next");
-    const chevron = (a: LensAction | undefined, glyph: string) => a ? (
-      <button type="button" className={clsx("lens-chevron", focusId === a.id && "is-focused")} data-action-id={a.id} aria-label={a.label} onClick={() => activate(a.id)}>{glyph}</button>
-    ) : null;
-    return (
-      <>
-        <span>{note}</span>
-        <span className="lens-dots" aria-label={`${index + 1} of ${count}`}>
-          {chevron(prev, "‹")}
-          {Array.from({ length: Math.min(count, 8) }).map((_, i) => <i key={i} className={i === index ? "is-on" : undefined} />)}
-          <span style={{ marginLeft: 10 }}>{index + 1} of {count}</span>
-          {chevron(next, "›")}
-        </span>
-      </>
-    );
-  }
-  const { start, end } = visibleWindow(Array.from({ length: count }, (_, i) => ({ listIndex: i })) as unknown as LensAction[], state.windowStart);
-  if (count <= LIST_WINDOW) return <><span>{note}</span><span /></>;
-  return (
-    <>
-      <span>{note}</span>
-      <span>{start + 1}–{end} of {count} {end < count ? "↓" : "↑"}</span>
-    </>
-  );
-}
-
-/** Status/position line under the content — one short line, never a toolbar. */
-export function StatusLine() {
-  const { state, actions } = useLens();
-  const s = state.screen;
-  const listCount = actions.filter((a) => a.listIndex !== undefined).length;
-  let body: ReactNode = null;
-  const sampleNote = state.capture === "sample" ? "Sample" : null;
-  if (state.composer) body = <><span>{state.composer.page + 1} of {COMPOSER_KEYS.length} key pages</span><span>Done saves</span></>;
-  else switch (s.id) {
-    case "glimpse-offers": case "online-listings": case "glimpse-cart-item": {
-      const list = s.id === "online-listings" ? state.listings.offers : s.id === "glimpse-cart-item" ? state.glimpse.saved : state.glimpse.offers;
-      const offer = currentOffer(state);
-      const idx = offer ? list.findIndex((o) => o.id === offer.id) : -1;
-      if (idx >= 0 && !["pending", "needs-action", "confirmed", "accepted", "error", "recovery"].includes(state.payment.status)) body = <Position count={list.length} index={idx} note={offer?.origin === "sample" ? "Sample prices" : state.glimpse.offersStatus === "loading" || state.listings.status === "loading" ? <span className="is-accent">Still searching…</span> : "Live search"} />;
-      break;
-    }
-    case "grocery": {
-      const t = cartTotals(state.grocery.cart);
-      body = <Position count={listCount} note={<>{t.unknownLines ? <span className="is-warn">{t.unknownLines} without price · </span> : null}{state.grocery.scanning ? <span className="is-accent">Scanning every 3 s</span> : sampleNote ? "Sample prices" : "Scan paused"}</>} />;
-      break;
-    }
-    case "grocery-item": body = <><span>{sampleNote ? `${HOME_STORE} · sample price` : "Live estimate"}</span><span>Add puts it in your cart</span></>; break;
-    case "grocery-list": {
-      const stock = homeStoreStock(state.list);
-      body = <Position count={listCount} note={stock.unavailable.length ? <span className="is-warn">{stock.store} lacks {stock.unavailable.length}</span> : `${stock.store} has all ${stock.covered.length} (demo stock)`} />;
-      break;
-    }
-    case "gourmet-recipe": body = <Position count={listCount} note="Uncheck what you already have" />; break;
-    case "gourmet-steps": { const r = recipeOf(state, String(s.params?.recipeId)); const pages = r ? paginateSteps(r.steps) : [[]]; body = <><span>Suggested recipe</span><span>Page {Number(s.params?.page ?? 0) + 1} of {pages.length}</span></>; break; }
-    case "grocery-checkout": body = <><span>Finish trip never charges a card</span><span>{sampleNote ? "Mock history" : ""}</span></>; break;
-    case "stores": body = <Position count={listCount} note={state.location.source === "demo" ? "From U District (demo)" : "From your location"} />; break;
-    case "wallet": body = <><span>Payments by Stripe · sandbox</span><span>{state.wallet.email ?? ""}</span></>; break;
-    default:
-      if (listCount > LIST_WINDOW) body = <Position count={listCount} note={sampleNote} />;
-      else if (sampleNote && s.id !== "picker") body = <><span>{sampleNote}</span><span /></>;
-  }
-  if (!body) return null;
-  return <div className="lens-status" aria-live="polite">{body}</div>;
-}
-
-function recipeOf(state: LensState, id: string) {
-  return state.gourmet.recipes.find((r) => r.id === id) ?? state.gourmet.saved.find((r) => r.id === id) ?? null;
-}
-
-function Center({ children }: { children: ReactNode }) {
-  return <div className="lens-center"><div>{children}</div></div>;
-}
-
-function Spinner({ pay }: { pay?: boolean }) {
-  return <div className={clsx("lens-spinner", pay && "is-pay")} aria-hidden />;
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Screen bodies
-// ──────────────────────────────────────────────────────────────────────────────
+/**
+ * Every lens screen, laid out as in the original Glance lens: absolute positions on the
+ * 600×600 panel, the top bar above (Lens.tsx), content from y≈68, and one bottom row of
+ * pills. Each control is an action from screens.ts, rendered by id.
+ */
 
 export function ScreenBody() {
   const { state } = useLens();
   if (state.composer) return <Composer />;
   switch (state.screen.id) {
-    case "picker": return <Picker />;
-    case "more": return <Rows />;
-    case "glimpse": return <GlimpseRoot />;
-    case "glimpse-candidates": return <Candidates />;
-    case "glimpse-offers": case "online-listings": case "glimpse-cart-item": return <OfferScreen />;
-    case "glimpse-cart": return <SavedList />;
-    case "handoff": return <Handoff />;
-    case "grocery": return <GroceryRoot />;
+    case "picker": return <ModeWheel />;
+    case "glimpse": return <GlimpseScan />;
+    case "glimpse-candidates": return <GlimpseCandidates />;
+    case "glimpse-offers": return <GlimpseOffers />;
+    case "online-listings": return <OnlineListings />;
+    case "glimpse-cart": return <GlimpseCart />;
+    case "glimpse-cart-item": return <GlimpseCartItem />;
+    case "handoff": return <HandoffDone />;
+    case "grocery": return <GroceryCart />;
     case "grocery-item": return <GroceryItem />;
     case "grocery-compare": return <GroceryCompare />;
     case "grocery-edit": return <GroceryEdit />;
-    case "grocery-manual": return <Rows />;
+    case "grocery-manual": return <GroceryManual />;
     case "grocery-list": return <GroceryList />;
-    case "grocery-checkout": return <TripSummary />;
-    case "grocery-bought": return <Bought />;
-    case "grocery-find": return <FindNext />;
-    case "gourmet": return <GourmetRoot />;
-    case "gourmet-recipes": return <RecipeList />;
-    case "gourmet-recipe": return <RecipeDetail />;
-    case "gourmet-steps": return <Steps />;
-    case "gourmet-shop": return <Rows />;
-    case "gourmet-added": return <Added />;
-    case "stores": return <Rows />;
-    case "nav": return <Center><p className="lens-eyebrow">Directions sent</p><h2 className="lens-title is-wrap">Check your phone for walking directions.</h2></Center>;
+    case "grocery-checkout": return <GroceryCheckout />;
+    case "grocery-bought": return <GroceryBought />;
+    case "grocery-find": return <GroceryFind />;
+    case "gourmet": return <GourmetHome />;
+    case "gourmet-recipes": return <GourmetRecipes />;
+    case "gourmet-recipe": return <GourmetRecipe />;
+    case "gourmet-steps": return <GourmetSteps />;
+    case "gourmet-shop": return <GourmetShop />;
+    case "gourmet-added": return <GourmetAdded />;
+    case "stores": return <StoresNearby />;
+    case "nav": return <NavHandoff />;
     case "wallet": return <WalletTray />;
-    case "wallet-orders": return <Rows />;
+    case "wallet-orders": return <WalletOrders />;
     case "wallet-order": return <OrderReceipt />;
-    default: return null;
+    default: return <><Center><p className="text-[34px] font-semibold">Nothing here yet</p></Center><BottomRow><Pill id="done" className="w-[260px]" /></BottomRow></>;
   }
 }
 
-// ── Picker ───────────────────────────────────────────────────────────────────
+const HEADLINE = "font-semibold tracking-[-0.02em]";
 
-function Picker() {
-  const { actions, focusId, activate, state } = useLens();
-  const modes = actions.filter((a) => a.id.startsWith("mode-"));
-  const selected = Math.max(0, modes.findIndex((a) => a.id === focusId));
-  const reduced = state.reducedMotion;
-  const source = cameraLine(state);
-  return (
-    <div className="lens-wheel" aria-label="Choose a mode">
-      <div className="lens-picker-top" aria-hidden>
-        <span className="lens-picker-mark">glance</span>
-        <span>↑↓ · select</span>
-      </div>
-      {modes.map((a, i) => {
-        const offset = i - selected;
-        const isSel = offset === 0;
-        return (
-          <motion.button
-            key={a.id}
-            type="button"
-            className={clsx("lens-wheel-row", isSel && "is-focused")}
-            data-action-id={a.id}
-            onClick={() => activate(a.id)}
-            animate={{ top: WHEEL_CENTER - WHEEL_ROW / 2 + offset * WHEEL_STEP, scale: isSel ? 1 : 0.62, opacity: isSel ? 1 : Math.abs(offset) === 1 ? 0.55 : 0.25, rotateX: offset * -28 }}
-            transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
-          >
-            <span className="lens-wheel-label">{a.label}</span>
-            {isSel && <span className="lens-wheel-hint">{a.hint}</span>}
-          </motion.button>
-        );
-      })}
-      <div className="lens-status lens-picker-source">{source}</div>
-    </div>
-  );
+function recipeOf(state: LensState, id: string) {
+  return state.gourmet.recipes.find((r) => r.id === id) ?? state.gourmet.saved.find((r) => r.id === id) ?? null;
 }
 
-/** One line for where frames come from; the glasses camera is the only native source. */
-function cameraLine(state: LensState): string {
+/** Where frames come from; the glasses camera (through the phone) is the only native source. */
+export function cameraLine(state: LensState): string {
   if (state.capture === "sample") return "Sample scenario";
   if (state.capture === "webcam") return "Camera";
   switch (state.pairing.status) {
@@ -215,443 +85,1173 @@ function cameraLine(state: LensState): string {
   }
 }
 
-/** Wheel geometry on the 600 px lens: the selected row is the outlined box, neighbours tilt away. */
-const WHEEL_CENTER = 298;
-const WHEEL_ROW = 164;
-const WHEEL_STEP = 128;
+const cameraDown = (state: LensState) => state.capture === "native" && state.pairing.status !== "connected";
 
-// ── Glimpse ──────────────────────────────────────────────────────────────────
-
-function GlimpseRoot() {
+/** A camera problem in one quiet line, on screens that need the camera. */
+function CameraNote({ className }: { className?: string }) {
   const { state } = useLens();
-  const g = state.glimpse;
-  if (g.scan === "scanning") return <Center><Spinner /><p className="lens-sub">Hold still for a moment</p></Center>;
-  if (g.scan === "error") return <Center><p className="lens-eyebrow">Couldn’t scan</p><h2 className="lens-title is-wrap" style={{ fontSize: 30 }}>{g.error ?? "Try again"}</h2></Center>;
-  const best = g.candidates.find((c) => c.id === g.chosenId) ?? g.candidates[0];
-  if (best) {
-    return (
-      <div>
-        <h2 className="lens-title is-wrap" style={{ fontSize: 44 }}>{best.label}</h2>
-        <p className="lens-sub">{best.attributes.join(" · ")}</p>
-        <div className="lens-tags">
-          <span className="lens-tag is-accent">{Math.round(best.confidence * 100)}% match</span>
-          <span className="lens-tag">{best.reason}</span>
-          {g.candidates.length > 1 && <span className="lens-tag">+{g.candidates.length - 1} more in view</span>}
-        </div>
-        <p className="lens-sub" style={{ marginTop: 14, fontSize: 19 }}>Estimated from where you’re facing · not eye tracking</p>
-      </div>
-    );
-  }
+  if (!cameraDown(state)) return null;
   return (
-    <div>
-      <p className="lens-sub is-wrap" style={{ fontSize: 24 }}>Look at a product and scan. Glance finds offers and lets you buy eligible items with your saved card.</p>
-      <div className="lens-tags"><span className="lens-tag is-accent">Scan is explicit</span><span className="lens-tag">Nothing analyzed until you ask</span></div>
+    <p className={clsx("flex items-center justify-center gap-2.5 text-[22px] font-medium", className)} style={{ color: AMBER }} role="status">
+      <Smartphone className="size-[24px]" aria-hidden /> {cameraLine(state)}
+    </p>
+  );
+}
+
+function DoneCheck({ size = 116 }: { size?: number }) {
+  return (
+    <span className="glance-rise flex shrink-0 items-center justify-center rounded-full" style={{ background: SUCCESS_GREEN, width: size, height: size }} aria-hidden>
+      <Check className="text-[#06210f]" style={{ width: size * 0.62, height: size * 0.62 }} strokeWidth={3.2} />
+    </span>
+  );
+}
+
+/** A full-width list row that isn't an item (Scan again, Search online, Find next item…). */
+function QuietRow({ id, children }: { id: string; children?: ReactNode }) {
+  return <Act id={id} className="flex size-full items-center justify-center gap-3 rounded-[24px] text-[27px] font-semibold ring-2 ring-white/25">{children}</Act>;
+}
+
+/* ── Mode picker ──────────────────────────────────────────────────────────── */
+
+const WHEEL_ROW = 128;
+const WHEEL_CENTER = 300;
+
+/**
+ * The modes as a vertical wheel filling the lens: the selected one centred, larger and
+ * brighter; the others recede (smaller, dimmer, tilted away).
+ */
+function ModeWheel() {
+  const { actions, focusId, state } = useLens();
+  const modes = actions.filter((a) => a.id.startsWith("mode-"));
+  const selected = Math.max(0, modes.findIndex((a) => a.id === focusId));
+  const reduced = state.reducedMotion;
+  const live = state.capture === "webcam" || state.pairing.status === "connected";
+  return (
+    <div className="absolute inset-0" aria-label="Choose a mode">
+      <div className="absolute top-9 left-11 opacity-80"><Wordmark size={40} /></div>
+      <p className="absolute top-12 right-11 text-[22px] font-medium text-white/50" aria-hidden>↑ ↓ · select</p>
+      <p className="absolute right-0 bottom-9 left-0 text-center text-[21px] font-medium text-white/55" role="status">
+        {live ? <span style={{ color: BLUE }}>● {cameraLine(state)}</span> : cameraLine(state)}
+      </p>
+      {/* Clipped above the status line, so a receding mode never runs into it. */}
+      <div className="absolute inset-x-0 top-[96px] bottom-[84px] overflow-hidden">
+      <motion.ul
+        className="absolute right-0 left-0"
+        style={{ top: WHEEL_CENTER - WHEEL_ROW / 2 - 96, perspective: 900 }}
+        animate={{ y: -selected * WHEEL_ROW }}
+        transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
+      >
+        {modes.map((a, i) => {
+          const distance = Math.abs(i - selected);
+          const isSelected = i === selected;
+          return (
+            <motion.li
+              key={a.id}
+              className="flex items-center justify-center"
+              style={{ height: WHEEL_ROW, transformOrigin: "center" }}
+              animate={{ scale: isSelected ? 1 : 0.62, opacity: isSelected ? 1 : distance === 1 ? 0.45 : 0.25, rotateX: reduced ? 0 : (i - selected) * -28 }}
+              transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
+            >
+              <Act id={a.id} className="flex flex-col items-center rounded-[30px] px-10 py-2">
+                <span className="text-[78px] leading-none font-semibold tracking-[-0.035em] text-white">{a.label}</span>
+                <span className="mt-2 text-[26px] font-medium" style={{ color: isSelected ? BLUE : "transparent" }}>{a.hint}</span>
+              </Act>
+            </motion.li>
+          );
+        })}
+      </motion.ul>
+      </div>
     </div>
   );
 }
 
-function Candidates() {
-  const { state } = useLens();
-  const list = state.glimpse.frozenCandidates ?? state.glimpse.candidates;
+export function Wordmark({ size, className }: { size: number; className?: string }) {
+  return (
+    <span className={className} style={{ fontSize: size, lineHeight: 1 }}>
+      <span className="inline-flex items-baseline font-semibold tracking-[-0.02em] text-white">
+        <svg viewBox="0 0 46 74" aria-hidden style={{ width: "0.46em", height: "0.74em", verticalAlign: "-0.3em", marginRight: "0.02em", overflow: "visible" }}>
+          <g fill="none" stroke="currentColor" strokeWidth={4.6} strokeLinecap="round">
+            <circle cx={22} cy={22} r={15} fill={`${BLUE}2e`} />
+            <line x1={22} y1={37} x2={22} y2={48} />
+            <ellipse cx={22} cy={60} rx={18} ry={12} fill={`${BLUE}2e`} />
+            <line x1={35} y1={12} x2={45} y2={7} />
+          </g>
+        </svg>
+        <span>lance</span>
+      </span>
+    </span>
+  );
+}
+
+/* ── Glimpse: looking ─────────────────────────────────────────────────────── */
+
+function GlimpseScan() {
+  const { state, snapshot } = useLens();
+  const g = state.glimpse;
+  const top = g.scan === "result" ? g.candidates.find((c) => c.id === g.chosenId) ?? g.candidates[0] : undefined;
+
+  if (!top) {
+    const scanning = g.scan === "scanning";
+    const failed = g.scan === "error";
+    const nothing = g.scan === "result" || g.scan === "no-food";
+    return (
+      <>
+        <Center>
+          {scanning ? <Spinner purpose="scan" /> : failed ? <AlertCircle className="size-[76px]" style={{ color: AMBER }} strokeWidth={1.7} aria-hidden /> : <ScanLine className="size-[76px]" style={{ color: BLUE }} strokeWidth={1.6} aria-hidden />}
+          <p className={clsx("mt-7 text-[42px]", HEADLINE)} role="status">
+            {scanning ? "Scanning item…" : failed ? "Couldn’t scan" : nothing ? "No item found" : "Point at an item"}
+          </p>
+          <p className="mt-3 line-clamp-2 text-[25px] text-white/60">
+            {scanning ? "Hold still while Glance identifies it" : failed ? g.error ?? "Try again" : nothing ? "Move closer and try scanning again" : "Choose Scan item when it’s in view"}
+          </p>
+        </Center>
+        <CameraNote className="absolute right-11 bottom-[142px] left-11" />
+        <BottomRow><Pill id={scanning ? "scan-cancel" : "scan"} className="w-[320px]" /></BottomRow>
+      </>
+    );
+  }
+
+  const rest = g.candidates.filter((c) => c.id !== top.id);
   return (
     <>
-      <p className="lens-sub">Paused while you choose</p>
-      <Rows render={(a) => {
-        const c = list.find((x) => `cand-${x.id}` === a.id)!;
-        return (<><div className="lens-row-main"><div className="lens-row-label">{c.label}</div><div className="lens-row-hint">{c.reason}</div></div><div className="lens-row-aside">{Math.round(c.confidence * 100)}%</div></>);
-      }} />
+      <div className="absolute top-[86px] right-11 left-11 flex gap-6" data-candidate={top.id}>
+        {snapshot && <FrameCrop src={snapshot} box={top.box} size={176} />}
+        <div className="min-w-0 flex-1 pt-1">
+          <p className="line-clamp-3 text-[46px] leading-[1.05] font-semibold tracking-[-0.03em]">{top.label}</p>
+          {/* One short line: what else is in view (the wearer may mean that instead). */}
+          {rest.length > 0 && <p className="mt-3 truncate text-[23px] text-white/50">Also: {rest.slice(0, 2).map((c) => c.label.toLowerCase()).join(", ")}</p>}
+        </div>
+      </div>
+      <div className="absolute right-11 bottom-[156px] left-11 flex justify-center">
+        <Pill id="scan" className="h-[64px] px-7 text-[26px]" icon={<ScanLine className="size-[28px]" aria-hidden />} />
+      </div>
+      <BottomRow>
+        <Pill id="see-offers" className="flex-[1.35] px-5" icon={<ShoppingBag className="size-[30px]" strokeWidth={2.2} aria-hidden />} />
+        <Pill id="not-this" className="flex-1 px-5" />
+      </BottomRow>
     </>
   );
 }
 
-function OfferScreen() {
-  const { state } = useLens();
-  const s = state.screen;
-  const list = s.id === "online-listings" ? state.listings.offers : s.id === "glimpse-cart-item" ? state.glimpse.saved : state.glimpse.offers;
-  const status = s.id === "online-listings" ? state.listings.status : state.glimpse.offersStatus;
-  const offer = currentOffer(state);
-  const p = state.payment;
+/* ── Glimpse: "Not this" ──────────────────────────────────────────────────── */
 
-  if (s.id === "online-listings" && (status === "idle" || (status === "loading" && !list.length) || status === "error" || status === "empty")) {
-    return (
-      <div>
-        <SearchField />
-        {status === "loading" && <Center><Spinner /><p className="lens-sub">Searching real listings…</p></Center>}
-        {status === "error" && <p className="lens-sub is-wrap" style={{ marginTop: 16 }}>{state.listings.error ?? "Search failed"}</p>}
-        {status === "empty" && <p className="lens-sub is-wrap" style={{ marginTop: 16 }}>No listings matched. Try a shorter name.</p>}
-        {status === "idle" && <p className="lens-sub is-wrap" style={{ marginTop: 16, fontSize: 20 }}>Live search · uses the configured model and web search</p>}
-      </div>
-    );
-  }
-  if (!offer) {
-    if (status === "loading") return <Center><Spinner /><p className="lens-sub">Comparing offers…</p></Center>;
-    if (status === "error") return <Center><p className="lens-eyebrow">Couldn’t load offers</p><p className="lens-sub is-wrap">{state.glimpse.error ?? "Try again"}</p></Center>;
-    return <Center><p className="lens-sub is-wrap">No offers yet. Try online listings.</p></Center>;
-  }
-  if (p.offerId === offer.id && ["pending", "needs-action", "confirmed", "accepted", "error", "recovery"].includes(p.status)) return <PaymentSurface offer={offer} />;
-  return <OfferCard offer={offer} />;
-}
-
-function SearchField() {
-  const { actions, focusId, activate, state } = useLens();
-  const a = actions.find((x) => x.id === "search");
-  if (!a) return null;
-  const q = state.listings.query;
+function GlimpseCandidates() {
+  const { state, snapshot } = useLens();
+  const list = state.glimpse.frozenCandidates ?? state.glimpse.candidates;
+  const ids = [...list.map((c) => `cand-${c.id}`), "keep-looking"];
   return (
-    <button type="button" className={clsx("lens-field", focusId === a.id && "is-focused")} data-action-id={a.id} onClick={() => activate(a.id)} style={{ position: "relative", borderRadius: 18, width: "100%", textAlign: "left", background: "transparent", color: "#fff", fontFamily: "inherit" }}>
-      {q ? q : <span className="is-placeholder">Search products</span>}
-    </button>
+    <>
+      <p className={clsx("absolute top-[74px] right-11 left-11 text-[34px]", HEADLINE)}>What caught your eye?</p>
+      <RowList
+        ids={ids}
+        rowHeight={92}
+        top={136}
+        bottom={40}
+        renderRow={(id) => {
+          const c = list.find((x) => `cand-${x.id}` === id);
+          if (!c) return <QuietRow id={id}>Scan again</QuietRow>;
+          return (
+            <Act id={id} className="flex size-full items-center gap-5 rounded-[26px] bg-white/[0.07] pr-6 pl-2.5 text-left">
+              {snapshot ? <FrameCrop src={snapshot} box={c.box} size={72} radius={18} /> : <span className="w-2" />}
+              <span className="min-w-0 flex-1 truncate text-[30px] leading-tight font-semibold tracking-[-0.015em]">{c.label}</span>
+            </Act>
+          );
+        }}
+      />
+    </>
   );
 }
 
-function OfferCard({ offer }: { offer: Offer }) {
-  const { state } = useLens();
+/* ── Offer cards (Glimpse offers, online listings, cart items) ────────────── */
+
+/** The line under the chips for a buy-in-lens offer: the card it will charge, or the quote. */
+function payNote(state: LensState, offer: Offer): ReactNode {
+  if (!isPayable(offer)) return null;
   const p = state.payment;
-  const payable = isPayable(offer);
-  const quote = payable && p.offerId === offer.id && p.quote ? p.quote : null;
-  const matchLabel = offer.match === "exact" ? "Exact match" : offer.match === "possible" ? "Possible match" : "Similar";
+  if (p.offerId === offer.id && p.quote) return <span>total {p.quote.shippingCents ? `incl. ${formatCents(p.quote.shippingCents)} shipping` : "· free shipping"}</span>;
+  if (state.wallet.status === "ready" && state.wallet.last4) return <span>{state.wallet.brand ?? "Card"} •• {state.wallet.last4} · Stripe</span>;
+  return <span>Set up your wallet to buy here</span>;
+}
+
+/** Card screens: the card, or (once Buy is pressed) where the payment is. */
+function CardScreen({ list, arriving, layout, secondary, snapshot, box }: { list: Offer[]; arriving: boolean; layout: CardLayout; secondary: "cart-add" | "cart-remove"; snapshot?: string | null; box?: NormalizedBox }) {
+  const { state } = useLens();
+  const offer = currentOffer(state);
+  if (!offer) return null;
+  if (payingFor(state, offer)) return <PaymentSurface offer={offer} />;
   return (
-    <div>
-      <div className="lens-offer">
-        <Thumb offer={offer} />
-        <div style={{ minWidth: 0 }}>
-          <div className="lens-offer-name">{offer.name}</div>
-          <div className="lens-offer-meta">{offer.retailer}{offer.variant ? ` · ${offer.variant}` : ""}{payable ? " · qty 1" : ""}</div>
-          <div className="lens-tags">
-            <span className={clsx("lens-tag", offer.match === "exact" && "is-accent")}>{matchLabel}</span>
-            {offer.sponsored && <span className="lens-tag is-sponsored">Sponsored</span>}
-            {offer.badge && !offer.sponsored && <span className={clsx("lens-tag", payable ? "is-pay" : "is-best")}>{offer.badge}</span>}
-            {!payable && <span className="lens-tag">External retailer</span>}
+    <>
+      <OfferCard offers={list} offer={offer} arriving={arriving} layout={layout} snapshot={snapshot} box={box} note={payNote(state, offer)} />
+      <CardButtons secondary={secondary} single={list.length < 2} />
+    </>
+  );
+}
+
+const OFFERS_LAYOUT: CardLayout = { top: 130, photo: 184 };
+
+function GlimpseOffers() {
+  const { state, snapshot } = useLens();
+  const g = state.glimpse;
+  const selected = g.candidates.find((c) => c.id === g.chosenId) ?? g.candidates[0];
+  const label = g.offersQuery ?? selected?.label ?? "Item";
+  const paying = payingFor(state, currentOffer(state));
+
+  const chip = !paying && (
+    <div className="absolute top-[68px] right-11 left-11 flex justify-center">
+      <Act id="change" label={`${label}: change item`} className="flex max-w-full min-w-0 items-center gap-2 rounded-full px-5 py-1.5 text-[23px] font-medium text-white/75 ring-2 ring-white/25">
+        <span className="truncate">{label}</span>
+        <ChevronDown className="size-[22px] shrink-0" aria-hidden />
+      </Act>
+    </div>
+  );
+
+  if (!g.offers.length) {
+    if (g.offersStatus === "loading" || !g.offersQuery) {
+      return (
+        <>
+          {chip}
+          <CardSkeleton layout={OFFERS_LAYOUT} snapshot={snapshot} box={selected?.box} />
+          <p className="absolute right-11 bottom-[72px] left-11 flex items-center justify-center gap-3 text-[24px] text-white/55" role="status"><Spinner small /> Finding offers…</p>
+        </>
+      );
+    }
+    const failed = g.offersStatus === "error";
+    return (
+      <>
+        {chip}
+        <div className="absolute right-11 left-11 flex gap-6" style={{ top: OFFERS_LAYOUT.top }}>
+          <OfferPhoto snapshot={snapshot} box={selected?.box} size={OFFERS_LAYOUT.photo} />
+          <div className="min-w-0 flex-1 pt-2">
+            <p className={clsx("text-[32px] leading-tight", HEADLINE)} role="alert">{failed ? "Couldn’t load offers" : "No offers found"}</p>
+            <p className="mt-2 line-clamp-3 text-[22px] leading-snug text-white/55">{failed ? g.error ?? "Check the connection and try again." : "Try again, or search with your own words."}</p>
           </div>
         </div>
-      </div>
-      <div className="lens-price">
-        {quote ? formatCents(quote.totalCents) : formatCents(offer.priceCents)}
-        {quote ? <small>total · {quote.shippingCents ? `incl. ${formatCents(quote.shippingCents)} shipping` : "free shipping"}{quote.taxCents ? ` · tax ${formatCents(quote.taxCents)}` : " · no tax"}</small> : offer.priceCents !== null ? <small>{offer.origin === "sample" ? "sample price" : "listed price"}</small> : null}
-      </div>
-      {payable && (
-        <p className="lens-sub" style={{ marginTop: 8 }}>
-          {state.wallet.status === "ready" && state.wallet.last4 ? `${state.wallet.brand ?? "Card"} •• ${state.wallet.last4} · Payments by Stripe` : "Set up your wallet to buy here"}
-        </p>
-      )}
-    </div>
+        <BottomRow>
+          <Pill id="retry-offers" className="flex-1" />
+          <Pill id="search-online" className="flex-1" />
+        </BottomRow>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {chip}
+      <CardScreen list={g.offers} arriving={g.offersStatus === "loading"} layout={OFFERS_LAYOUT} secondary="cart-add" snapshot={snapshot} box={selected?.box} />
+    </>
   );
 }
 
-function Thumb({ offer }: { offer: Offer }) {
-  const url = offer.imageUrl;
-  if (!url) return <div className="lens-thumb"><ShoppingBag aria-hidden /></div>;
-  return (
-    <div className={clsx("lens-thumb", offer.origin === "sample" && !url.endsWith(".svg") && "is-sample")}>
-      {/* External product images: contained on a white tile, no referrer. */}
-      <img src={url} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async" onError={(e) => { (e.currentTarget.parentElement as HTMLElement).innerHTML = ""; }} />
+/** Below the search field: the same card as Glimpse offers, a little smaller. */
+const LISTINGS_LAYOUT: CardLayout = { top: 162, photo: 164 };
+
+function OnlineListings() {
+  const { state } = useLens();
+  const l = state.listings;
+  const paying = payingFor(state, currentOffer(state));
+  const search = !paying && (
+    <div className="absolute top-[68px] right-11 left-11">
+      <LensField id="search" placeholder="Search for an item" />
     </div>
   );
+
+  if (!l.offers.length) {
+    if (l.status === "loading") {
+      return (
+        <>
+          {search}
+          <CardSkeleton layout={LISTINGS_LAYOUT} />
+          <p className="absolute right-11 bottom-[72px] left-11 flex items-center justify-center gap-3 text-[24px] text-white/55" role="status"><Spinner small /> Searching stores…</p>
+        </>
+      );
+    }
+    if (l.status === "idle") {
+      return (
+        <>
+          {search}
+          <Center className="top-[170px]">
+            <ShoppingBag className="size-[64px] text-white/35" strokeWidth={1.6} aria-hidden />
+            <p className="mt-5 text-[26px] leading-snug text-white/60">Type a brand, model or size.<br />Glance searches real stores.</p>
+          </Center>
+          <BottomRow><Pill id="go" className="w-[300px]" /></BottomRow>
+        </>
+      );
+    }
+    const failed = l.status === "error";
+    return (
+      <>
+        {search}
+        <div className="absolute right-11 left-11 flex gap-6" style={{ top: LISTINGS_LAYOUT.top }}>
+          <OfferPhoto size={LISTINGS_LAYOUT.photo} />
+          <div className="min-w-0 flex-1 pt-2">
+            <p className={clsx("text-[32px] leading-tight", HEADLINE)} role="alert">{failed ? "Couldn’t search" : "No listings found"}</p>
+            <p className="mt-2 line-clamp-3 text-[22px] leading-snug text-white/55">{failed ? l.error ?? "Check the connection and try again." : "Try a brand, model or size."}</p>
+          </div>
+        </div>
+        <BottomRow><Pill id="retry" className="w-[300px]" /></BottomRow>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {search}
+      <CardScreen list={l.offers} arriving={l.status === "loading"} layout={LISTINGS_LAYOUT} secondary="cart-add" />
+    </>
+  );
 }
+
+/* ── Glimpse cart ─────────────────────────────────────────────────────────── */
+
+function GlimpseCart() {
+  const { state } = useLens();
+  const items = state.glimpse.saved;
+  if (!items.length) {
+    return (
+      <>
+        <Center>
+          <ShoppingCart className="size-[68px] text-white/40" strokeWidth={1.6} aria-hidden />
+          <p className={clsx("mt-5 text-[38px]", HEADLINE)}>Your cart is empty</p>
+        </Center>
+        <BottomRow><Pill id="keep-shopping" className="w-[300px]" /></BottomRow>
+      </>
+    );
+  }
+  // Integer cents; an unknown price is never counted as zero.
+  const knownCents = items.reduce((sum, o) => sum + (o.priceCents ?? 0), 0);
+  const unpriced = items.filter((o) => o.priceCents === null).length;
+  return (
+    <>
+      <div className="absolute top-[72px] right-11 left-11 flex items-baseline justify-between gap-4">
+        <p className={clsx("text-[34px]", HEADLINE)}>Cart <span className="text-white/45 tabular-nums">· {items.length}</span></p>
+        <p className="text-[34px] font-bold tracking-[-0.02em] tabular-nums" data-cart-total>
+          {formatCents(knownCents)}
+          {unpriced > 0 && <span className="ml-2 text-[19px] font-medium text-white/45">+ {unpriced} unpriced</span>}
+        </p>
+      </div>
+      <RowList
+        ids={items.map((o) => `saved-${o.id}`)}
+        rowHeight={96}
+        top={136}
+        bottom={40}
+        renderRow={(id, i) => {
+          const o = items[i];
+          return (
+            <Act id={id} className="flex size-full items-center gap-5 rounded-[26px] bg-white/[0.07] pr-6 pl-2.5 text-left">
+              <OfferPhoto image={o.imageUrl} size={76} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[25px] leading-tight font-semibold">{o.name}</span>
+                <span className="block truncate text-[20px] text-white/55">{o.retailer}</span>
+              </span>
+              <span className="shrink-0 text-[28px] font-bold tabular-nums">{o.priceCents === null ? <span className="text-[22px] font-semibold text-white/55">See price</span> : formatCents(o.priceCents)}</span>
+            </Act>
+          );
+        }}
+      />
+    </>
+  );
+}
+
+const CART_ITEM_LAYOUT: CardLayout = { top: 124, photo: 184 };
+
+function GlimpseCartItem() {
+  const { state } = useLens();
+  const offer = currentOffer(state);
+  if (!offer) {
+    return (
+      <>
+        <Center><p className={clsx("text-[36px]", HEADLINE)}>Removed from cart</p></Center>
+        <BottomRow><Pill id="keep-shopping" className="w-[300px]" /></BottomRow>
+      </>
+    );
+  }
+  const saved = state.glimpse.saved.find((o) => o.id === offer.id);
+  return (
+    <>
+      {!payingFor(state, offer) && <p className="absolute top-[76px] right-11 left-11 truncate text-center text-[22px] text-white/50">{saved?.candidateLabel}</p>}
+      <CardScreen list={state.glimpse.saved} arriving={false} layout={CART_ITEM_LAYOUT} secondary="cart-remove" />
+    </>
+  );
+}
+
+/* ── Payment (Buy pressed on a buy-in-lens offer) ─────────────────────────── */
 
 function PaymentSurface({ offer }: { offer: Offer }) {
   const { state } = useLens();
   const p = state.payment;
   const total = p.order?.totalCents ?? p.quote?.totalCents ?? offer.priceCents;
-  switch (p.status) {
-    case "pending":
-      return <Center><Spinner pay /><h2 className="lens-title">Paying…</h2><p className="lens-sub">{formatCents(total)} · {offer.retailer}</p></Center>;
-    case "needs-action":
-      return <Center><div className="lens-badge is-warn"><Check aria-hidden /></div><h2 className="lens-title is-wrap" style={{ fontSize: 34 }}>Your bank wants a quick check</h2><p className="lens-sub is-wrap">Verify on your phone. Your order is saved.</p></Center>;
-    case "confirmed":
-    case "accepted":
-      return (
-        <Center>
-          <div className="lens-badge is-ok"><Check aria-hidden /></div>
-          <h2 className="lens-title">{p.status === "accepted" ? "Order accepted" : "Payment confirmed"}</h2>
-          <p className="lens-sub">{formatCents(total)} · {offer.retailer}</p>
-          <p className="lens-sub" style={{ fontSize: 19 }}>{p.order?.reference ? `Ref ${p.order.reference}` : ""}{p.status === "confirmed" ? " · waiting for the seller" : " · demo fulfillment"}</p>
-        </Center>
-      );
-    case "error":
-    case "recovery":
-      return <Center><div className="lens-badge is-warn">!</div><h2 className="lens-title is-wrap" style={{ fontSize: 34 }}>{p.status === "recovery" ? "Price or stock changed" : "Payment didn’t go through"}</h2><p className="lens-sub is-wrap">{p.error ?? "Your selection is kept."}</p></Center>;
-    default:
-      return null;
-  }
-}
-
-function SavedList() {
-  const { state } = useLens();
-  if (!state.glimpse.saved.length) return <Center><ShoppingBag style={{ width: 64, height: 64, color: "rgba(255,255,255,0.4)", margin: "0 auto 12px" }} aria-hidden /><p className="lens-sub">Nothing saved yet</p></Center>;
-  return <Rows render={(a) => { const o = state.glimpse.saved.find((x) => `saved-${x.id}` === a.id)!; return (<><div className="lens-row-main"><div className="lens-row-label">{o.name}</div><div className="lens-row-hint">{o.retailer} · {o.candidateLabel}</div></div><div className="lens-row-aside is-strong">{formatCents(o.priceCents)}</div></>); }} />;
-}
-
-function Handoff() {
-  const { state } = useLens();
-  const h = state.handoff;
-  const label = h.status === "sending" ? "Sending…" : h.status === "queued" ? "Waiting for your phone" : h.status === "sent" ? (state.pairing.code ? "Sent to your iPhone" : "Opened on this device") : "Couldn’t send";
-  return (
-    <Center>
-      {h.status === "sending" || h.status === "queued" ? <Spinner /> : <div className={clsx("lens-badge", h.status === "sent" ? "is-ok" : "is-warn")}>{h.status === "sent" ? <Check aria-hidden /> : "!"}</div>}
-      <h2 className="lens-title is-wrap" style={{ fontSize: 36 }}>{label}</h2>
-      <p className="lens-sub is-wrap">{h.title}</p>
-      {h.error && <p className="lens-sub is-wrap" style={{ color: "var(--lens-warn)" }}>{h.error}</p>}
-    </Center>
-  );
-}
-
-// ── Grocery ──────────────────────────────────────────────────────────────────
-
-function GroceryRoot() {
-  const { state } = useLens();
-  const gr = state.grocery;
-  const t = cartTotals(gr.cart);
-  if (gr.pendingAsk) {
-    return <Center><p className="lens-eyebrow">Did this go in your cart?</p><h2 className="lens-title is-wrap">{gr.pendingAsk.label}</h2><p className="lens-sub">{gr.pendingAsk.packageSize ?? ""}</p></Center>;
-  }
-  if (!gr.cart.length) {
-    // One instruction at a time: what to do next, or why the camera can't help yet.
-    const cameraDown = state.capture === "native" && state.pairing.status !== "connected";
-    return (
-      <div>
-        <div className="lens-figure">{formatCents(0)}</div>
-        <p className="lens-sub" style={{ marginTop: 8 }}>0 items</p>
-        <p className="lens-sub is-wrap" style={{ marginTop: 18, fontSize: 22 }}>
-          {cameraDown ? cameraLine(state) : gr.scanning ? "Hold an item up, then put it in your cart. Seeing or holding never adds by itself." : "Start scan, then hold an item up."}
-        </p>
-      </div>
-    );
-  }
+  const done = p.status === "confirmed" || p.status === "accepted";
+  const problem = p.status === "needs-action" || p.status === "error" || p.status === "recovery";
+  const title = p.status === "pending" ? "Paying…" : done ? "Done!" : p.status === "needs-action" ? "Quick check" : p.status === "recovery" ? "Price changed" : "Didn’t go through";
+  const line = done
+    ? (p.status === "accepted" ? "Order accepted" : "Payment confirmed · waiting for the seller")
+    : p.status === "needs-action" ? "Your bank wants to verify on your phone. Your order is saved."
+    : problem ? p.error ?? "Your selection is kept." : `${offer.retailer} · Payments by Stripe`;
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <div className="lens-figure is-mid">{formatCents(t.knownSubtotalCents)}</div>
-        <div className="lens-sub">{t.units} item{t.units === 1 ? "" : "s"}{t.unknownLines ? " · some unpriced" : ""}</div>
+      <div className="absolute top-[78px] right-11 left-11 flex flex-col items-center text-center">
+        {p.status === "pending" ? <span className="flex size-[116px] items-center justify-center"><Spinner /></span>
+          : done ? <DoneCheck />
+          : <AlertCircle className="size-[116px]" style={{ color: AMBER }} strokeWidth={1.6} aria-hidden />}
+        <p className="mt-5 text-[60px] leading-none font-bold tracking-[-0.03em]" role="status">{title}</p>
+        <p className="mt-4 line-clamp-1 max-w-full text-[27px] font-medium text-white/85">{offer.name}</p>
+        <p className="mt-1 text-[25px] text-white/60">{offer.retailer} · <span className="font-semibold text-white tabular-nums">{formatCents(total)}</span></p>
       </div>
-      <Rows render={(a) => { const l = gr.cart.find((x) => `line-${x.productKey}` === a.id)!; return (<><div className="lens-row-main"><div className="lens-row-label">{l.label}</div><div className="lens-row-hint">{l.quantity} × {formatCents(l.unitPriceCents)}{l.packageSize ? ` · ${l.packageSize}` : ""}{l.priceSource === "manual" ? " · you entered" : l.priceSource === "unknown" ? " · price unknown" : ""}</div></div><div className="lens-row-aside is-strong">{l.unitPriceCents === null ? "—" : formatCents(l.unitPriceCents * l.quantity)}</div></>); }} />
+      <p className="absolute right-11 bottom-[142px] left-11 line-clamp-2 text-center text-[22px] font-medium text-white/70" data-payment-status={p.status}>
+        {line}{done && p.order?.reference ? ` · Ref ${p.order.reference}` : ""}
+      </p>
+      <BottomRow>
+        <Pill id="pay-wait" className="w-[300px]" />
+        <Pill id="pay-recover" className="flex-[1.4]" />
+        <Pill id="pay-done" className="flex-1" />
+        <Pill id="pay-orders" className="flex-1" />
+        <Pill id="pay-retry" className="flex-1" />
+        <Pill id="pay-back" className="flex-1" />
+      </BottomRow>
     </>
   );
 }
+
+/* ── Done: the link is on the wearer's phone ──────────────────────────────── */
+
+function HandoffDone() {
+  const { state } = useLens();
+  const h = state.handoff;
+  const failed = h.status === "failed";
+  const status = h.status === "sent" ? (state.pairing.code ? "Sent to your phone" : "Opened on this device")
+    : h.status === "queued" ? "Open Glance on your phone to finish"
+    : failed ? h.error ?? "Couldn’t reach your phone"
+    : "Sending to your phone…";
+  return (
+    <>
+      <div className="absolute top-[78px] right-11 left-11 flex flex-col items-center text-center">
+        {failed ? <AlertCircle className="size-[116px]" style={{ color: AMBER }} strokeWidth={1.6} aria-hidden /> : <DoneCheck />}
+        <p className="mt-5 text-[60px] leading-none font-bold tracking-[-0.03em]">{failed ? "Not sent" : "Done!"}</p>
+        {h.title && <p className="mt-4 line-clamp-2 max-w-full text-[27px] font-medium text-white/85">{h.title}</p>}
+      </div>
+      <p className="absolute right-11 bottom-[142px] left-11 flex items-center justify-center gap-2.5 text-[23px] font-medium text-white/75" role="status" data-handoff-status={h.status}>
+        {h.status === "sending" ? <Spinner small /> : <Smartphone className="size-[26px] shrink-0" style={{ color: failed ? AMBER : BLUE }} aria-hidden />}
+        <span className="truncate">{status}</span>
+      </p>
+      <BottomRow>
+        {failed ? <><Pill id="retry" className="flex-1" /><Pill id="done" className="flex-1" /></> : <><Pill id="done" className="flex-1" /><Pill id="keep" className="flex-[1.3]" /></>}
+      </BottomRow>
+    </>
+  );
+}
+
+/* ── Grocery: the cart ────────────────────────────────────────────────────── */
+
+function lineNote(l: { priceSource: string; packageSize: string | null }) {
+  if (l.priceSource === "unknown") return "Price unknown";
+  if (l.priceSource === "shelf-label") return "From shelf label";
+  if (l.priceSource === "manual") return "Entered";
+  if (l.priceSource === "online") return `Online price${l.packageSize ? ` · ${l.packageSize}` : ""}`;
+  return l.packageSize ?? "";
+}
+
+function GroceryCart() {
+  const { state } = useLens();
+  const gr = state.grocery;
+  const t = cartTotals(gr.cart);
+  const { action: undo } = useAction("undo");
+  const pending = gr.pendingAsk;
+  const listTop = pending ? 348 : 268;
+  const openList = state.list.filter((i) => !i.done).length;
+  const estimated = t.unknownLines > 0 || gr.cart.some((l) => l.priceSource === "shelf-label" || l.priceSource === "online");
+
+  return (
+    <>
+      <div className="absolute top-[66px] right-11 left-11 flex h-[44px] items-center justify-between gap-3">
+        <p className="flex min-w-0 items-center gap-2 text-[22px] text-white/70" role="status">
+          {gr.scanning && <Spinner small purpose="scan" />}
+          <span className="truncate">{cameraDown(state) ? cameraLine(state) : gr.scanning ? "Scanning for items…" : "Scanning paused"}</span>
+        </p>
+        <Act id="scan" className="flex h-[44px] shrink-0 items-center rounded-full px-4 text-[21px] font-semibold ring-2 ring-white/30" />
+      </div>
+      <div className="absolute top-[120px] right-11 left-11 flex items-end justify-between">
+        <div>
+          <p className="text-[28px] font-medium text-white/70">Your cart</p>
+          <p className="text-[84px] leading-[0.95] font-bold tracking-[-0.045em] tabular-nums">
+            {formatCents(t.knownSubtotalCents)}
+            {estimated && gr.cart.length > 0 && <span className="ml-3 align-top text-[26px] font-semibold tracking-normal" style={{ color: BLUE }}>est.</span>}
+          </p>
+        </div>
+        <div className="pb-2 text-right text-[22px] leading-snug text-white/55">
+          {undo && (
+            <Act id="undo" label="Undo" className="mb-2 ml-auto flex w-fit items-center gap-1.5 rounded-full px-3.5 py-1 text-[20px] font-semibold text-white/85 ring-2 ring-white/35">
+              <Undo2 className="size-[20px]" aria-hidden /> Undo
+            </Act>
+          )}
+          {t.units} item{t.units === 1 ? "" : "s"}
+          {t.unknownLines > 0 && <><br />+{t.unknownLines} unpriced</>}
+          {gr.cart.some((l) => l.priceSource === "catalog") && state.capture === "sample" && <><br />sample prices</>}
+          {gr.cart.some((l) => l.priceSource === "online") && <><br />online prices</>}
+        </div>
+      </div>
+
+      {pending && (
+        <div className="absolute top-[250px] right-11 left-11 flex items-center gap-4 rounded-[26px] bg-white/[0.08] py-3 pr-3 pl-6">
+          <p className="min-w-0 flex-1 text-[24px] leading-tight">Did <b className="font-semibold">{pending.label}</b> go in the cart?</p>
+          <Pill id="ask-yes" className="h-[64px] px-6 text-[24px]" />
+          <Pill id="ask-no" className="h-[64px] px-6 text-[24px]" />
+        </div>
+      )}
+
+      {gr.cart.length === 0 ? !pending && (
+        <div className="absolute right-11 left-11 text-center" style={{ top: listTop + 20 }}>
+          <ShoppingCart className="mx-auto size-[56px] text-white/35" strokeWidth={1.6} aria-hidden />
+          <p className="mt-4 text-[26px] leading-snug text-white/60">{cameraDown(state) ? "Waiting for the glasses camera." : gr.scanning ? "Hold an item up, then put it in your cart." : "Start scan, then hold an item up."}</p>
+          <p className="mt-1 text-[22px] text-white/40">Seeing or holding never adds by itself.</p>
+        </div>
+      ) : (
+        <RowList
+          ids={gr.cart.map((l) => `line-${l.productKey}`)}
+          rowHeight={66}
+          gap={10}
+          top={listTop}
+          bottom={140}
+          renderRow={(id, i) => {
+            const l = gr.cart[i];
+            return (
+              <Act id={id} className="flex size-full items-center gap-4 rounded-[20px] bg-white/[0.06] px-6 text-left">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[27px] leading-tight font-semibold">{l.label} {l.quantity > 1 && <span className="font-medium text-white/60">×{l.quantity}</span>}</span>
+                  <span className="block truncate text-[19px] text-white/50">{lineNote(l)}</span>
+                </span>
+                <span className="text-[28px] font-semibold tabular-nums">{l.unitPriceCents === null ? "—" : formatCents(l.unitPriceCents * l.quantity)}</span>
+              </Act>
+            );
+          }}
+        />
+      )}
+
+      <div className="absolute right-11 bottom-11 left-11 flex items-center gap-3">
+        <Pill id="list" className="h-[76px] flex-1 px-4 text-[25px]" icon={<ListChecks className="size-[26px]" aria-hidden />}>
+          List{openList > 0 && <span className="ml-2 tabular-nums" style={{ color: BLUE }}>{openList}</span>}
+        </Pill>
+        <Pill id="add" className="h-[76px] flex-1 px-4 text-[25px]" icon={<Plus className="size-[26px]" aria-hidden />} />
+        <Pill id="finish" className="h-[76px] flex-[1.4] px-4 text-[25px]" />
+      </div>
+    </>
+  );
+}
+
+/* ── Grocery: the item held up ────────────────────────────────────────────── */
 
 function GroceryItem() {
   const { state } = useLens();
   const key = String(state.screen.params?.productKey ?? "");
   const product = CATALOG_BY_ID[key];
-  const ins = state.grocery.insights[key];
-  const data = ins?.data ?? null;
-  const name = product?.name ?? state.grocery.heldLabel ?? key;
-  const size = product?.size ?? state.grocery.heldSize ?? "";
-  const best = data?.bestSame && data.homePriceCents !== null && data.bestSame.priceCents < (data.homePriceCents ?? Infinity) ? data.bestSame : null;
-  const held = state.grocery.heldKey === key ? state.grocery.heldPrice ?? null : null;
-  const price = data?.homePriceCents ?? product?.qfcPriceCents ?? held?.cents ?? null;
-  const priceNote = data?.homePriceCents == null && !product && held?.source === "estimate" ? "typical price" : null;
-  return (
-    <div>
-      <h2 className="lens-title is-wrap" style={{ fontSize: 40 }}>{name}</h2>
-      <p className="lens-sub">{size ? `${size} · ` : ""}{HOME_STORE}</p>
-      <div className="lens-price" style={{ fontSize: 60 }}>{price === null && ins?.status === "loading" ? "…" : formatCents(price)}{priceNote && !best ? <small>{priceNote}</small> : null}{best ? <small>{best.store} <span style={{ color: "var(--lens-best)" }}>{formatCents(best.priceCents)}</span></small> : null}</div>
-      {ins?.status === "loading" && <p className="lens-sub" style={{ marginTop: 10 }}>Checking nutrition…</p>}
-      {data?.nutrition && (
-        <p className="lens-sub" style={{ marginTop: 10, fontSize: 20 }}>≈ {data.nutrition.kcal} cal · {data.nutrition.carbs} g carbs · {data.nutrition.sugar} g sugar · Estimate</p>
-      )}
-      <div className="lens-tags">
-        {data?.flags.map((f) => <span key={f.text} className={clsx("lens-tag", f.severity === "warn" ? "is-sponsored" : undefined)}>⚠ {f.text}</span>)}
-      </div>
-      {data?.nudge && !state.grocery.nudgedKeys.includes(`${key}:shown`) && <p className="lens-sub is-wrap" style={{ marginTop: 10, fontSize: 21, color: "var(--lens-accent)" }}>{data.nudge}</p>}
-    </div>
-  );
-}
+  const insight = state.grocery.insights[key]?.data ?? null;
+  const isHeld = state.grocery.heldKey === key;
+  const name = product?.name ?? (isHeld ? state.grocery.heldLabel : null) ?? key;
+  const size = product?.size ?? (isHeld ? state.grocery.heldSize : null);
+  const held = isHeld ? state.grocery.heldPrice ?? null : null;
+  const inCart = state.grocery.cart.find((l) => l.productKey === key);
+  const sample = state.capture === "sample";
 
-function GroceryCompare() {
-  const { state } = useLens();
-  const key = String(state.screen.params?.productKey ?? "");
-  const tab = state.screen.params?.tab;
-  const product = CATALOG_BY_ID[key];
-  const data = state.grocery.insights[key]?.data;
-  if (tab === "nutrition") {
-    const n = data?.nutrition;
-    if (!n) return <Center><p className="lens-sub">No nutrition data</p></Center>;
-    return (
-      <div>
-        <p className="lens-sub">{product?.name} · per {n.serving}</p>
-        <div className="lens-card" style={{ fontSize: 24 }}>
-          <Row k="Calories" v={`≈ ${n.kcal}`} /><Row k="Protein" v={`${n.protein} g`} /><Row k="Carbs" v={`${n.carbs} g`} /><Row k="Sugar" v={`${n.sugar} g`} /><Row k="Fat" v={`${n.fat} g`} /><Row k="Sodium" v={`${n.sodium} mg`} />
-        </div>
-        <p className="lens-sub" style={{ marginTop: 10, fontSize: 19 }}>{data.allergens.length ? `Typically contains ${data.allergens.join(", ")}` : "No allergen listed in this sample"} · Estimate · Sample</p>
-      </div>
-    );
-  }
-  const comps = data?.comparisons ?? [];
-  const home = data?.homePriceCents ?? product?.qfcPriceCents ?? null;
-  const bestSame = comps.filter((c) => c.match === "same").sort((a, b) => a.priceCents - b.priceCents)[0];
+  // Sample: this store's price, then nearby stores and online retailers (sample prices).
+  // Live: the shelf label Claude read, then online listings, then a marked "≈" typical price.
+  const here = insight?.homePriceCents ?? product?.qfcPriceCents ?? null;
+  const live = groceryOnline(state, key);
+  const online = live?.offers.filter((o) => o.priceCents !== null) ?? [];
+  const price: { cents: number; note: string; approx?: boolean } | null =
+    !sample && held?.source === "shelf-label" ? { cents: held.cents, note: "shelf label" }
+    : sample && here !== null ? { cents: here, note: `${HOME_STORE} · sample` }
+    : online[0] ? { cents: online[0].priceCents!, note: `online · ${online[0].retailer}` }
+    : held ? { cents: held.cents, note: held.source === "estimate" ? "typical price" : "shelf label · est.", approx: held.source === "estimate" }
+    : here !== null ? { cents: here, note: HOME_STORE }
+    : null;
+  // A two-line nudge takes the third comparison row's space (the full list is on Compare).
+  const rowLimit = insight?.nudge ? 2 : 3;
+  const same = sample ? compareOffers(state, key).filter((c) => c.match === "same") : [];
+  const cheapest = same.length ? Math.min(...same.map((c) => c.priceCents)) : null;
+  const rows = sample
+    ? same.slice(0, rowLimit).map((c) => ({ key: c.store, name: c.store, cents: c.priceCents, best: c.priceCents === cheapest && (here === null || c.priceCents < here) }))
+    : online.slice(0, rowLimit).map((o, i) => ({ key: o.id, name: o.retailer, cents: o.priceCents!, best: i === 0 }));
+
   return (
     <>
-      <p className="lens-sub">{product?.size} · here at {HOME_STORE} {formatCents(home)} · sample prices</p>
-      <Rows render={(a) => {
-        const i = Number(a.id.split("-").pop());
-        const c = comps[i];
-        if (!c) return null;
-        const store = STORES.find((s) => s.name === c.store);
-        const km = store ? `${haversine(state.location.lat, state.location.lng, store.lat, store.lng).toFixed(1)} km` : "Online";
-        return (<><div className="lens-row-main"><div className="lens-row-label">{c.store}</div><div className="lens-row-hint">{c.match === "alternative" ? "Different pack" : "Same item"} · {c.size} · {km}{c.store === "Amazon" || c.store === "Temu" ? " · demo buy" : ""}</div></div><div className={clsx("lens-row-aside is-strong", c === bestSame && "is-best")}>{c === bestSame ? <span style={{ fontSize: 18, marginRight: 8 }}>Best</span> : null}{formatCents(c.priceCents)}</div></>);
-      }} />
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className="truncate text-[40px] leading-[1.05] font-semibold tracking-[-0.025em]">{name}</p>
+        <p className="mt-0.5 truncate text-[21px] text-white/55">
+          <span style={{ color: BLUE }}>{isHeld ? "You’re holding" : "Item"}</span> · {size ?? "Size unknown"}
+          {inCart && <span className="font-semibold text-white"> · in cart ×{inCart.quantity}</span>}
+        </p>
+        <p className="mt-1.5 flex items-baseline gap-4">
+          <span className="text-[64px] leading-none font-bold tracking-[-0.045em] tabular-nums">{price ? `${price.approx ? "≈ " : ""}${formatCents(price.cents)}` : "Price unknown"}</span>
+          {price && <span className="truncate text-[20px] text-white/50">{price.note}</span>}
+        </p>
+        {rows.length > 0 ? (
+          <ul className="mt-2 space-y-0.5">
+            {rows.map((o) => (
+              <li key={o.key} className="flex items-baseline justify-between gap-4 text-[23px] text-white/75">
+                <span className="truncate">{o.name}</span>
+                <span className="flex items-baseline gap-3">
+                  {o.best && <span className="text-[19px] font-semibold" style={{ color: BLUE }}>Best</span>}
+                  <span className="font-semibold tabular-nums">{formatCents(o.cents)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : live?.status === "loading" ? (
+          <p className="mt-3 text-[21px] text-white/50" role="status">Checking prices online…</p>
+        ) : null}
+        <div className="mt-2"><InsightStrip productKey={key} /></div>
+      </div>
+      <BottomRow>
+        <Pill id="add" className="h-[76px] flex-1" icon={<Plus className="size-[28px]" aria-hidden />} />
+        <Pill id="buy-amazon" className="h-[76px] flex-[1.4] text-[27px]" />
+        <Pill id="compare" className="h-[76px] flex-1" />
+      </BottomRow>
     </>
   );
 }
 
-function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
+const amount = (n: number) => (Number.isInteger(n) ? `${n}` : n.toFixed(1));
+
+/** Nutrition (label vs ≈ estimate), up to two diet/allergy flags, and at most one nudge. */
+function InsightStrip({ productKey }: { productKey: string }) {
+  const { state } = useLens();
+  const entry = state.grocery.insights[productKey];
+  if (!entry || entry.status === "loading") return <p className="text-[21px] text-white/45" role="status">Checking nutrition…</p>;
+  const insight = entry.data;
+  if (entry.status === "error" || !insight) return null;
+  const n = insight.nutrition;
+  const approx = insight.nutritionOrigin === "label" ? "" : "≈ ";
+  const parts = n ? [`${approx}${amount(n.kcal)} cal`, `${amount(n.carbs)} g carbs`, n.sugar > 0 && `${amount(n.sugar)} g sugar`, n.protein >= 5 && `${amount(n.protein)} g protein`].filter(Boolean).slice(0, 3) : [];
+  // Glanceable: two lines under the price at most (a nudge takes the second flag's place).
+  const flags = insight.flags.slice(0, insight.nudge ? 1 : 2);
+  return (
+    <div className="space-y-1">
+      {n && (
+        <p className="flex items-baseline gap-3 text-[21px] text-white/75">
+          <span className="truncate tabular-nums">{parts.join(" · ")}</span>
+          <span className="shrink-0 text-[18px] font-semibold text-white/50">{insight.nutritionOrigin === "label" ? "From the label" : "Estimate"}{state.capture === "sample" && " · sample"}</span>
+        </p>
+      )}
+      {flags.map((f) => (
+        <p key={f.text} className="flex items-center gap-2 truncate text-[22px] font-semibold" style={{ color: f.severity === "warn" ? AMBER : "rgb(255 255 255 / 0.75)" }}>
+          <AlertTriangle className="size-[22px] shrink-0" aria-hidden /> {f.text}
+        </p>
+      ))}
+      {insight.nudge && (
+        <p className="flex items-start gap-2 text-[21px] leading-snug" style={{ color: BLUE }}>
+          <Sparkles className="mt-0.5 size-[20px] shrink-0" aria-hidden /> <span className="line-clamp-2">{insight.nudge}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ── Grocery: compare (nearby stores with sample prices, or live online prices) ── */
+
+const km = (aLat: number, aLng: number, bLat: number, bLng: number) => {
   const R = 6371, dLat = ((bLat - aLat) * Math.PI) / 180, dLng = ((bLng - aLng) * Math.PI) / 180;
   const s = Math.sin(dLat / 2) ** 2 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(s));
-}
+};
 
-function Row({ k, v }: { k: string; v: string }) {
-  return <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--lens-muted)" }}>{k}</span><span>{v}</span></div>;
-}
-
-function GroceryEdit() {
-  const { state, actions, focusId, activate } = useLens();
+function GroceryCompare() {
+  const { state, actions } = useLens();
   const key = String(state.screen.params?.productKey ?? "");
-  const line = state.grocery.cart.find((l) => l.productKey === key);
-  if (!line) return <Center><p className="lens-sub">Removed</p></Center>;
-  const btn = (id: string, className?: string) => { const a = actions.find((x) => x.id === id); if (!a) return null; return <button type="button" className={clsx("lens-pill", className, focusId === id && "is-focused")} data-action-id={id} onClick={() => activate(id)} style={{ flex: "0 0 auto" }}>{a.label}</button>; };
-  return (
-    <div>
-      <h2 className="lens-title is-wrap" style={{ fontSize: 34 }}>{line.label}</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 8 }}>
-        {btn("qty-minus", "is-quiet")}
-        <div style={{ flex: 1, textAlign: "center" }}><div className="lens-figure is-mid">{line.quantity}</div><div className="lens-sub" style={{ textAlign: "center" }}>in cart</div></div>
-        {btn("qty-plus", "is-quiet")}
-      </div>
-      <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
-        {btn("price", "is-quiet")}
-        {btn("remove", "is-danger")}
-      </div>
-    </div>
-  );
-}
+  const product = CATALOG_BY_ID[key];
+  const live = groceryOnline(state, key);
+  const hasSearch = actions.some((a) => a.id === "search-online");
 
-function GroceryList() {
-  const { state } = useLens();
-  const left = state.list.filter((i) => !i.done).length;
-  if (!state.list.length) return <Center><p className="lens-sub is-wrap">Your list is empty. Add a recipe in Gourmet.</p></Center>;
+  if (live) {
+    const name = product?.name ?? state.grocery.cart.find((l) => l.productKey === key)?.label ?? state.grocery.heldLabel ?? key;
+    const size = product?.size ?? state.grocery.heldSize;
+    const priced = live.offers.flatMap((o) => (o.priceCents === null ? [] : [o.priceCents]));
+    const cheapest = priced.length ? Math.min(...priced) : null;
+    return (
+      <>
+        <div className="absolute top-[100px] right-11 left-11">
+          <p className={clsx("text-[38px]", HEADLINE)}>Prices online</p>
+          <p className="mt-0.5 truncate text-[21px] text-white/50">{name}{size ? ` · ${size}` : ""} · web prices · confirm at retailer</p>
+        </div>
+        {live.status === "loading" && !live.offers.length && (
+          <div className="absolute top-[214px] right-11 left-11 flex items-center gap-4 text-[26px] text-white/70" role="status"><Spinner small /> Checking retailers…</div>
+        )}
+        {live.status !== "loading" && !live.offers.length && (
+          <p className="absolute top-[200px] right-11 left-11 text-[24px] text-white/60">{live.status === "error" ? "Couldn’t check prices right now." : "No listings found for this item."}</p>
+        )}
+        <RowList
+          ids={[...live.offers.map((_, i) => `online-${i}`), ...(hasSearch ? ["search-online"] : [])]}
+          rowHeight={84}
+          top={live.offers.length ? 208 : 290}
+          bottom={40}
+          renderRow={(id, i) => {
+            const o = live.offers[i];
+            if (!o) return <QuietRow id={id}>Search online</QuietRow>;
+            const best = o.priceCents !== null && o.priceCents === cheapest;
+            return (
+              <Act id={id} className={clsx("flex size-full items-center gap-4 rounded-[24px] px-6 text-left", best ? "bg-white/[0.1]" : "bg-white/[0.05]")}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[28px] leading-tight font-semibold">{o.retailer}</span>
+                  <span className="block truncate text-[19px] text-white/55">{o.name}</span>
+                </span>
+                {best && <span className="text-[20px] font-semibold" style={{ color: BLUE }}>Best</span>}
+                <span className="text-[30px] font-semibold tabular-nums">{o.priceCents === null ? "—" : formatCents(o.priceCents)}</span>
+              </Act>
+            );
+          }}
+        />
+      </>
+    );
+  }
+
+  const offers = compareOffers(state, key);
+  const here = state.grocery.insights[key]?.data?.homePriceCents ?? product?.qfcPriceCents ?? null;
+  const sameCheapest = Math.min(...offers.filter((c) => c.match === "same").map((c) => c.priceCents));
   return (
     <>
-      <p className="lens-sub">{left} of {state.list.length} left · items tick off as they go in the cart</p>
-      <Rows render={(a) => { const it = state.list.find((x) => `list-${x.key}` === a.id)!; return (<><span className={clsx("lens-check", it.done && "is-on")}>{it.done && <Check aria-hidden />}</span><div className="lens-row-main"><div className="lens-row-label" style={it.done ? { textDecoration: "line-through", opacity: 0.6 } : undefined}>{it.name}</div><div className="lens-row-hint">{formatAmounts(it.amounts)}{it.recipes.length ? ` · ${it.recipes[0]}` : ""}</div></div></>); }} />
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className={clsx("text-[38px]", HEADLINE)}>Nearby & online</p>
+        <p className="mt-0.5 truncate text-[21px] text-white/50">{product?.size} · here at {HOME_STORE} {formatCents(here)} · sample prices</p>
+      </div>
+      <RowList
+        ids={offers.map((_, i) => `cmp-${i}`)}
+        rowHeight={84}
+        top={208}
+        bottom={40}
+        renderRow={(id, i) => {
+          const c = offers[i];
+          const store = STORES.find((s) => s.name === c.store);
+          const best = c.match === "same" && c.priceCents === sameCheapest;
+          const onlineStore = c.store === "Amazon" || c.store === "Temu";
+          const where = onlineStore ? "Online · demo buy" : store ? `${km(state.location.lat, state.location.lng, store.lat, store.lng).toFixed(1)} km` : "";
+          return (
+            <Act id={id} className={clsx("flex size-full items-center gap-4 rounded-[24px] px-6 text-left", best ? "bg-white/[0.1]" : "bg-white/[0.05]")}>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[28px] leading-tight font-semibold">{c.store}</span>
+                <span className="block truncate text-[19px] text-white/55">{c.match === "same" ? `Same item · ${c.size}` : `Alternative · ${c.size}`}{where ? ` · ${where}` : ""}</span>
+              </span>
+              {best && <span className="text-[20px] font-semibold" style={{ color: BLUE }}>Best</span>}
+              <span className="text-[30px] font-semibold tabular-nums">{formatCents(c.priceCents)}</span>
+            </Act>
+          );
+        }}
+      />
     </>
   );
 }
 
-function TripSummary() {
+/* ── Grocery: edit a cart line ────────────────────────────────────────────── */
+
+function GroceryEdit() {
+  const { state } = useLens();
+  const key = String(state.screen.params?.productKey ?? "");
+  const line = state.grocery.cart.find((l) => l.productKey === key);
+  if (!line) return <><Center><p className={clsx("text-[36px]", HEADLINE)}>Removed</p></Center><BottomRow><Pill id="done" className="w-[260px]" /></BottomRow></>;
+  const note = lineNote(line);
+  return (
+    <>
+      <div className="absolute top-[104px] right-11 left-11 text-center">
+        <p className={clsx("truncate text-[38px]", HEADLINE)}>{line.label}</p>
+        <p className="text-[22px] text-white/50">{line.unitPriceCents === null ? "Price unknown" : `${formatCents(line.unitPriceCents)} each`}{note ? ` · ${note}` : ""}</p>
+      </div>
+      <div className="absolute top-[200px] right-11 left-11 flex items-center justify-center gap-10">
+        <Act id="qty-minus" label="Fewer" className="flex size-[84px] items-center justify-center rounded-full ring-[3px] ring-white/50"><Minus className="size-[40px]" aria-hidden /></Act>
+        <span className="w-[150px] text-center text-[88px] leading-none font-bold tabular-nums">×{line.quantity}</span>
+        <Act id="qty-plus" label="More" className="flex size-[84px] items-center justify-center rounded-full ring-[3px] ring-white/50"><Plus className="size-[40px]" aria-hidden /></Act>
+      </div>
+      <div className="absolute top-[318px] right-16 left-16"><LensField id="price" placeholder="Enter price, e.g. 4.99" /></div>
+      <BottomRow>
+        <Pill id="remove" className="flex-1" />
+        <Pill id="done" className="flex-1" />
+      </BottomRow>
+    </>
+  );
+}
+
+/* ── Grocery: add by name ─────────────────────────────────────────────────── */
+
+function GroceryManual() {
+  const { state, actions } = useLens();
+  const ids = actions.filter((a) => a.listIndex !== undefined).sort((a, b) => a.listIndex! - b.listIndex!).map((a) => a.id);
+  return (
+    <>
+      <p className={clsx("absolute top-[90px] right-11 left-11 text-[34px]", HEADLINE)}>Add an item</p>
+      <div className="absolute top-[142px] right-11 left-11"><LensField id="manual-type" placeholder="Type any item" /></div>
+      <p className="absolute top-[232px] right-11 left-11 text-[20px] text-white/50">Or pick one · sample catalog{state.capture === "sample" ? " · sample prices" : ""}</p>
+      <RowList
+        ids={ids}
+        rowHeight={70}
+        gap={10}
+        top={270}
+        bottom={40}
+        renderRow={(id) => {
+          const product = GROCERY_CATALOG.find((p) => `manual-${p.id}` === id);
+          if (!product) return <QuietRow id={id}><Plus className="size-[26px]" aria-hidden /> Add “{state.grocery.manualText.trim()}”</QuietRow>;
+          return (
+            <Act id={id} className="flex size-full items-center gap-4 rounded-[22px] bg-white/[0.06] px-6 text-left">
+              <span className="min-w-0 flex-1 truncate text-[27px] font-semibold">{product.name} <span className="font-normal text-white/50">· {product.size}</span></span>
+              <span className="text-[26px] font-semibold tabular-nums">{formatCents(product.qfcPriceCents)}</span>
+            </Act>
+          );
+        }}
+      />
+    </>
+  );
+}
+
+/* ── Grocery: shopping list (planned in Gourmet, ticked off here) ─────────── */
+
+function GroceryList() {
+  const { state, actions } = useLens();
+  const list = state.list;
+  const left = list.filter((i) => !i.done).length;
+  const ids = [...list.map((i) => `list-${i.key}`), ...(actions.some((a) => a.id === "find") ? ["find"] : [])];
+  const stock = left ? homeStoreStock(list) : null;
+  const stockText = stock && (stock.unavailable.length ? `${stock.store} lacks ${stock.unavailable.length} item${stock.unavailable.length === 1 ? "" : "s"} (demo stock)` : `${stock.store} has all ${stock.covered.length} (demo stock)`);
+  return (
+    <>
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className={clsx("text-[38px]", HEADLINE)}>Shopping list</p>
+        <p className="mt-0.5 truncate text-[21px] text-white/50">{list.length ? `${left} of ${list.length} left · items tick off as they go in the cart` : "Add ingredients from a recipe in Gourmet"}</p>
+        {stockText && <p className="truncate text-[21px]" style={{ color: BLUE }}>{stockText}</p>}
+      </div>
+      <RowList
+        ids={ids}
+        rowHeight={64}
+        gap={8}
+        top={stockText ? 248 : 212}
+        bottom={40}
+        renderRow={(id) => {
+          const item = list.find((i) => `list-${i.key}` === id);
+          if (!item) return <QuietRow id={id}>Find next item · demo</QuietRow>;
+          return (
+            <Act id={id} className="flex size-full items-center gap-4 rounded-[20px] bg-white/[0.06] px-5 text-left">
+              <span aria-hidden className={clsx("flex size-[34px] shrink-0 items-center justify-center rounded-[10px] ring-[3px]", item.done ? "ring-transparent" : "ring-white/45")} style={item.done ? { background: SUCCESS_GREEN } : undefined}>
+                {item.done && <Check className="size-[24px] text-[#06210f]" strokeWidth={3} />}
+              </span>
+              <span className={clsx("min-w-0 flex-1 truncate text-[26px] font-medium", item.done && "text-white/45 line-through")}>{item.name}</span>
+              <span className="max-w-[170px] truncate text-[20px] text-white/50">{item.recipes[0] ?? formatAmounts(item.amounts)}</span>
+            </Act>
+          );
+        }}
+      />
+    </>
+  );
+}
+
+/* ── Grocery: checked out (the trip's total into this month's spending) ───── */
+
+/** Emphasis, not categories: this trip in the accent, earlier spending in stepped greys. */
+const GREYS = ["rgb(255 255 255 / 0.62)", "rgb(255 255 255 / 0.44)", "rgb(255 255 255 / 0.32)", "rgb(255 255 255 / 0.22)"];
+
+function GroceryCheckout() {
   const { state } = useLens();
   const s = state.grocery.summary;
-  if (!s) return <Center><p className="lens-sub">No trip yet</p></Center>;
-  const total = s.segments.reduce((n, x) => n + x.cents, 0);
-  const colors = ["#a9cdf5", "#6b6b6b", "#8a8a8a", "#a9a9a9", "#505050"];
-  const r = 78, c = 2 * Math.PI * r;
-  const offsets = s.segments.reduce<number[]>((acc, seg) => [...acc, (acc[acc.length - 1] ?? 0) + seg.cents], []).map((end, i) => end - s.segments[i].cents);
-  return (
-    <div>
-      <div className="lens-donut">
-        <svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Spending this month">
-          {s.segments.map((seg, i) => {
-            const frac = total ? seg.cents / total : 0;
-            const dash = `${frac * c} ${c}`;
-            const rot = (offsets[i] / Math.max(total, 1)) * 360 - 90;
-            return <motion.circle key={seg.label} cx="100" cy="100" r={r} fill="none" stroke={seg.highlight ? colors[0] : colors[(i % 4) + 1]} strokeWidth="26" strokeDasharray={dash} transform={`rotate(${rot} 100 100)`} initial={state.reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.08 }} />;
-          })}
-          <text x="100" y="96" textAnchor="middle" fill="#fff" fontSize="30" fontWeight="700">{formatCents(s.thisTripCents)}</text>
-          <text x="100" y="122" textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="15">this trip</text>
-        </svg>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="lens-badge is-ok" style={{ width: 36, height: 36, margin: 0 }}><Check style={{ width: 22, height: 22 }} aria-hidden /></span><span style={{ fontSize: 30, fontWeight: 700 }}>Checked out</span></div>
-          <p className="lens-sub" style={{ marginTop: 6 }}>{s.items} item{s.items === 1 ? "" : "s"}{s.unknownLines ? ` · ${s.unknownLines} unpriced` : ""}</p>
-          <p style={{ fontSize: 26, margin: "6px 0 0" }}><b>{formatCents(s.monthToDateCents)}</b> <span className="lens-sub" style={{ display: "inline" }}>in October</span></p>
-          <p className="lens-sub">Last month {formatCents(s.lastMonthCents)}</p>
-        </div>
-      </div>
-      <div className="lens-legend" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 12 }}>
-        {s.segments.map((seg, i) => <div key={seg.label} className={seg.highlight ? "is-strong" : undefined}><span><i style={{ background: seg.highlight ? colors[0] : colors[(i % 4) + 1] }} />{seg.label}</span><span>{formatCents(seg.cents)}</span></div>)}
-      </div>
-    </div>
-  );
-}
-
-function Bought() {
-  const { state } = useLens();
-  const b = state.grocery.bought[state.grocery.bought.length - 1];
-  return <Center><div className="lens-badge is-ok"><Check aria-hidden /></div><h2 className="lens-title">Bought</h2><p className="lens-sub">{b?.name}</p><p className="lens-sub">{b?.retailer} · {formatCents(b?.priceCents ?? null)} · sample price</p><p className="lens-sub" style={{ fontSize: 19 }}>Demo · finish on your phone · no merchant integration</p></Center>;
-}
-
-function FindNext() {
-  const { state } = useLens();
-  const stops = aisleStops(state.list);
-  const i = Number(state.screen.params?.stop ?? 0);
-  const stop = stops[i];
-  if (!stop) return <Center><p className="lens-sub">Nothing left to find</p></Center>;
-  const prevAisle = i === 0 ? 0 : stops[i - 1].aisle;
-  const arrow = stop.aisle > prevAisle ? "↑" : stop.aisle < prevAisle ? "↓" : stop.side === "left" ? "←" : "→";
-  return (
-    <div>
-      <div className="lens-arrow" aria-hidden>{arrow}</div>
-      <h2 className="lens-title" style={{ textAlign: "center" }}>Aisle {stop.aisle} · {stop.side}</h2>
-      <p className="lens-sub" style={{ textAlign: "center" }}>{stop.name} · {stop.section}</p>
-      <p className="lens-sub" style={{ textAlign: "center", fontSize: 19, marginTop: 8 }}>Stop {i + 1} of {stops.length} · scripted store layout</p>
-    </div>
-  );
-}
-
-// ── Gourmet ──────────────────────────────────────────────────────────────────
-
-function GourmetRoot() {
-  const { state } = useLens();
-  const g = state.gourmet;
-  if (g.scan === "scanning") return <Center><Spinner /><p className="lens-sub">Looking at the plate</p></Center>;
-  if (g.scan === "no-food") return <Center><p className="lens-eyebrow">No dish in view</p><p className="lens-sub is-wrap">Point at prepared food and scan again.</p></Center>;
-  if (g.scan === "error") return <Center><p className="lens-eyebrow">Couldn’t scan</p><p className="lens-sub is-wrap">{g.error}</p></Center>;
-  if (g.hypotheses.length) {
-    const best = g.hypotheses[0];
+  if (!s) {
     return (
       <>
-        <h2 className="lens-title is-wrap" style={{ fontSize: 40 }}>{best.name}</h2>
-        <p className="lens-sub">{best.cues.join(" · ")}</p>
-        <Rows render={(a) => { const i = Number(a.id.split("-")[1]); const h = g.hypotheses[i]; return (<><div className="lens-row-main"><div className="lens-row-label">{h.name}</div></div><div className={clsx("lens-row-aside", i === 0 && "is-best")}>{i === 0 ? "Best match" : "Possible"}</div></>); }} />
+        <Center>
+          <DoneCheck />
+          <p className="mt-5 text-[52px] leading-none font-bold tracking-[-0.03em]" role="status">All checked out!</p>
+        </Center>
+        <BottomRow><Pill id="done" className="w-[260px]" /></BottomRow>
       </>
     );
   }
+  let grey = 0;
+  const segments = s.segments.map((seg) => ({ ...seg, color: seg.highlight ? BLUE : GREYS[grey++ % GREYS.length] }));
+  const month = new Date().toLocaleString("en-US", { month: "long" });
   return (
-    <div>
-      <p className="lens-sub is-wrap" style={{ fontSize: 24 }}>Look at a dish and scan. Glance suggests recipes and turns them into a shopping list.</p>
-      <div className="lens-tags"><span className="lens-tag is-accent">Suggestions, not restaurant recipes</span></div>
-    </div>
+    <>
+      <div className="absolute top-[100px] right-11 left-11 flex items-center gap-7">
+        <SpendDonut segments={segments} centre={s.thisTripCents} size={200} instant={state.reducedMotion} />
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2.5 text-[30px] font-bold tracking-[-0.02em]" role="status">
+            <span className="flex size-[34px] items-center justify-center rounded-full" style={{ background: SUCCESS_GREEN }} aria-hidden><Check className="size-[22px] text-[#06210f]" strokeWidth={3.4} /></span>
+            Checked out
+          </p>
+          <p className="mt-2 text-[22px] text-white/70 tabular-nums">
+            {s.items} item{s.items === 1 ? "" : "s"}
+            {s.onlineOrdersCents > 0 && ` + ${formatCents(s.onlineOrdersCents)} online`}
+            {s.unknownLines > 0 && " · est."}
+          </p>
+          <p className="mt-3 text-[25px] leading-tight font-semibold tabular-nums">{formatCents(s.monthToDateCents)} <span className="font-medium text-white/60">in {month}</span></p>
+          {/* Month so far vs a whole month isn't a fair "over/under", so last month is just context. */}
+          <p className="mt-1 text-[20px] text-white/50 tabular-nums">Last month {formatCents(s.lastMonthCents)}</p>
+        </div>
+      </div>
+      <ul className="absolute top-[318px] right-11 left-11 grid grid-cols-2 gap-x-6 gap-y-1">
+        {segments.map((seg) => (
+          <li key={seg.label} className="flex items-center gap-2.5 text-[21px]">
+            <span className="size-[14px] shrink-0 rounded-full" style={{ background: seg.color }} aria-hidden />
+            <span className={clsx("min-w-0 flex-1 truncate", seg.highlight ? "font-semibold text-white" : "text-white/70")}>{seg.label}</span>
+            <span className="text-white/80 tabular-nums">{formatCents(seg.cents)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="absolute right-11 bottom-[136px] left-11 flex items-center justify-center gap-2.5 text-[20px] font-medium text-white/50">
+        <Smartphone className="size-[22px]" style={{ color: BLUE }} aria-hidden />
+        {state.capture === "sample" ? "Sample prices · mock history" : "Receipt details on your phone"}
+      </p>
+      <BottomRow><Pill id="done" className="w-[260px]" /></BottomRow>
+    </>
   );
 }
 
-function RecipeList() {
-  const { state } = useLens();
-  const g = state.gourmet;
-  if (g.recipesStatus === "loading") return <Center><Spinner /><p className="lens-sub">Writing three recipes…</p></Center>;
-  if (g.recipesStatus === "error") return <Center><p className="lens-eyebrow">Couldn’t get recipes</p><p className="lens-sub is-wrap">{g.error}</p></Center>;
-  if (g.recipesStatus === "empty" || !g.recipes.length) return <Center><p className="lens-sub is-wrap">No recipes for this dish yet.</p></Center>;
-  return <><p className="lens-sub">Like {state.gourmet.dish ?? "the dish you saw"}</p><Rows /></>;
+function SpendDonut({ segments, centre, size, instant }: { segments: { label: string; cents: number; color: string; highlight?: boolean }[]; centre: number; size: number; instant: boolean }) {
+  const total = segments.reduce((sum, x) => sum + x.cents, 0) || 1;
+  const stroke = 30;
+  const r = (size - stroke) / 2;
+  const gap = segments.length > 1 ? 2 / (2 * Math.PI * r) : 0;
+  const starts = segments.map((_, i) => segments.slice(0, i).reduce((sum, x) => sum + x.cents / total, 0));
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Spending this month: ${segments.map((x) => `${x.label} ${formatCents(x.cents)}`).join(", ")}`}>
+      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+        {segments.map((x, i) => {
+          const length = Math.max(0, x.cents / total - gap);
+          return (
+            <motion.circle
+              key={x.label}
+              cx={size / 2} cy={size / 2} r={r} fill="none" stroke={x.color} strokeWidth={stroke}
+              transform={`rotate(${starts[i] * 360} ${size / 2} ${size / 2})`}
+              initial={{ pathLength: x.highlight && !instant ? 0 : length }}
+              animate={{ pathLength: length }}
+              transition={x.highlight && !instant ? { delay: 0.45 + i * 0.05, duration: 1.1, ease: [0.23, 1, 0.32, 1] } : { duration: 0 }}
+            />
+          );
+        })}
+      </g>
+      <text x="50%" y="46%" textAnchor="middle" fill="#fff" fontSize="34" fontWeight="700">{formatCents(centre)}</text>
+      <text x="50%" y="60%" textAnchor="middle" fill="rgb(255 255 255 / 0.55)" fontSize="19" fontWeight="500">this trip</text>
+    </svg>
+  );
 }
 
-function RecipeDetail() {
+/* ── Grocery: bought online (demo handoff) ────────────────────────────────── */
+
+function GroceryBought() {
+  const { state } = useLens();
+  const b = state.grocery.bought.at(-1);
+  return (
+    <>
+      <div className="absolute top-[112px] right-11 left-11 flex flex-col items-center text-center">
+        <DoneCheck />
+        <p className="mt-5 text-[60px] leading-none font-bold tracking-[-0.03em]" role="status">Bought</p>
+        <p className="mt-4 line-clamp-1 max-w-full text-[27px] font-medium text-white/85">{b?.name}</p>
+        <p className="mt-1 text-[25px] text-white/60">{b?.retailer} · <span className="font-semibold text-white tabular-nums">{formatCents(b?.priceCents ?? null)}</span> · sample price</p>
+      </div>
+      <p className="absolute right-11 bottom-[142px] left-11 flex items-center justify-center gap-2.5 text-[23px] font-medium text-white/70">
+        <Smartphone className="size-[26px]" style={{ color: BLUE }} aria-hidden /> Demo · finish on your phone
+      </p>
+      <BottomRow>
+        <Pill id="done" className="flex-1" />
+        <Pill id="view" className="flex-1" />
+      </BottomRow>
+    </>
+  );
+}
+
+/* ── Grocery: in-store arrows to the next list item (scripted aisle map) ──── */
+
+function GroceryFind() {
+  const { state } = useLens();
+  const stops = aisleStops(state.list);
+  const index = Number(state.screen.params?.stop ?? 0);
+  const stop = stops.length ? stops[index % stops.length] : null;
+  const Arrow = !stop ? ArrowUp : stop.side === "left" ? CornerUpLeft : CornerUpRight;
+  return (
+    <>
+      {stop ? (
+        <div className="absolute top-[104px] right-11 left-11 flex flex-col items-center text-center">
+          <motion.span
+            key={stop.productId}
+            initial={state.reducedMotion ? false : { y: 18, opacity: 0 }}
+            animate={{ y: state.reducedMotion ? 0 : [18, 0, -6, 0], opacity: 1 }}
+            transition={{ duration: state.reducedMotion ? 0 : 1.1, ease: "easeOut" }}
+            className="flex size-[150px] items-center justify-center rounded-full"
+            style={{ boxShadow: `inset 0 0 0 4px ${BLUE}` }}
+            aria-hidden
+          >
+            <Arrow className="size-[96px]" style={{ color: BLUE }} strokeWidth={2.4} />
+          </motion.span>
+          <p className="mt-5 text-[54px] leading-none font-bold tracking-[-0.03em]">Aisle {stop.aisle}</p>
+          <p className="mt-2 text-[26px] text-white/75">{stop.section} · on your {stop.side}</p>
+          <p className="mt-3 flex items-center gap-2 text-[28px] font-semibold"><MapPin className="size-[26px]" style={{ color: BLUE }} aria-hidden /> {stop.name}</p>
+          <p className="mt-1 text-[20px] text-white/45">Stop {(index % stops.length) + 1} of {stops.length} · scripted demo map</p>
+        </div>
+      ) : (
+        <div className="absolute top-[200px] right-11 left-11 text-center text-[28px] text-white/65">Everything on your list is in the cart.</div>
+      )}
+      <BottomRow>
+        <Pill id="done" className="flex-1" />
+        <Pill id="next" className="flex-1" />
+      </BottomRow>
+    </>
+  );
+}
+
+/* ── Gourmet: scan → dish hypotheses ──────────────────────────────────────── */
+
+function GourmetHome() {
+  const { state } = useLens();
+  const g = state.gourmet;
+
+  if (g.scan === "scanning") {
+    return (
+      <>
+        <Center>
+          <Spinner purpose="scan" />
+          <p className={clsx("mt-7 text-[40px]", HEADLINE)} role="status">Scanning dish…</p>
+          <p className="mt-3 text-[25px] text-white/60">Hold still while Glance identifies it</p>
+        </Center>
+        <BottomRow><Pill id="scan-cancel" className="w-[260px]" /></BottomRow>
+      </>
+    );
+  }
+
+  if (g.scan === "result" && g.hypotheses.length) {
+    const [top] = g.hypotheses;
+    return (
+      <>
+        <div className="absolute top-[102px] right-11 left-11">
+          <Eyebrow>Looks like</Eyebrow>
+          <p className="mt-0.5 truncate text-[40px] leading-[1.05] font-semibold tracking-[-0.03em]">{top.name}</p>
+          <p className="mt-1 truncate text-[21px] text-white/50">{top.cues.slice(0, 2).join(" · ")}</p>
+        </div>
+        <RowList
+          ids={[...g.hypotheses.map((_, i) => `dish-${i}`), "rescan"]}
+          rowHeight={74}
+          gap={10}
+          top={238}
+          bottom={40}
+          renderRow={(id, i) => {
+            const dish = g.hypotheses[i];
+            if (!dish) return <QuietRow id={id}><ScanLine className="size-[28px]" aria-hidden /> Rescan</QuietRow>;
+            return (
+              <Act id={id} className="flex size-full items-center gap-4 rounded-[22px] bg-white/[0.07] px-6 text-left">
+                <span className="min-w-0 flex-1 truncate text-[28px] font-semibold">{dish.name}</span>
+                <span className="text-[20px]" style={{ color: i === 0 ? BLUE : "rgb(255 255 255 / 0.6)" }}>{i === 0 ? "Best match" : "Possible"}</span>
+              </Act>
+            );
+          }}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Center>
+        {g.scan === "error" ? <AlertCircle className="size-[76px]" style={{ color: AMBER }} strokeWidth={1.7} aria-hidden /> : <UtensilsCrossed className="size-[76px]" style={{ color: BLUE }} strokeWidth={1.6} aria-hidden />}
+        <p className="mt-6 text-[44px] leading-tight font-semibold tracking-[-0.025em]">
+          {g.scan === "no-food" ? "That doesn’t look like a dish" : g.scan === "error" ? "Couldn’t scan" : "Look at a dish"}
+        </p>
+        <p className="mt-3 line-clamp-2 text-[25px] text-white/60">{g.scan === "error" ? g.error ?? "Try again" : "Choose Scan dish when it’s in view"}</p>
+      </Center>
+      <CameraNote className="absolute right-11 bottom-[142px] left-11" />
+      <BottomRow><Pill id="scan" className="w-[320px]" icon={<ScanLine className="size-[30px]" aria-hidden />} /></BottomRow>
+    </>
+  );
+}
+
+/* ── Gourmet: recipe choices ──────────────────────────────────────────────── */
+
+function GourmetRecipes() {
+  const { state } = useLens();
+  const g = state.gourmet;
+  return (
+    <>
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className={clsx("truncate text-[38px]", HEADLINE)}>Recipes for {g.dish ?? "this dish"}</p>
+        <p className="mt-0.5 truncate text-[21px] text-white/50">Make something like the dish you saw</p>
+      </div>
+      {g.recipesStatus === "loading" ? (
+        <Center className="top-[180px]">
+          <Spinner />
+          <p className="mt-6 text-[32px] font-semibold" role="status">Finding recipes…</p>
+        </Center>
+      ) : g.recipesStatus === "error" || g.recipesStatus === "empty" || !g.recipes.length ? (
+        <>
+          <Center className="top-[180px]">
+            <p className="text-[32px] font-semibold">{g.recipesStatus === "error" ? "Couldn’t load recipes" : "No recipes found for this dish"}</p>
+            {g.error && <p className="mt-2 line-clamp-2 text-[22px] text-white/55">{g.error}</p>}
+          </Center>
+          <BottomRow><Pill id="retry" className="w-[300px]" /></BottomRow>
+        </>
+      ) : (
+        <RowList
+          ids={g.recipes.map((r) => `recipe-${r.id}`)}
+          rowHeight={112}
+          top={204}
+          bottom={40}
+          renderRow={(id, i) => {
+            const r = g.recipes[i];
+            return (
+              <Act id={id} className="flex size-full flex-col justify-center rounded-[26px] bg-white/[0.07] px-7 text-left">
+                <span className="line-clamp-2 text-[27px] leading-tight font-semibold tracking-[-0.015em]">{r.title}</span>
+                <span className="mt-1 text-[22px] text-white/60 tabular-nums">{r.minutes} min · serves {r.servings} · {r.ingredients.length} ingredients</span>
+              </Act>
+            );
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/* ── Gourmet: recipe detail (servings, ingredient checklist, actions) ─────── */
+
+function GourmetRecipe() {
   const { state } = useLens();
   const id = String(state.screen.params?.recipeId ?? "");
   const r = recipeOf(state, id);
-  if (!r) return null;
+  if (!r) return <><Center><p className={clsx("text-[34px]", HEADLINE)}>Recipe not found</p></Center><BottomRow><Pill id="back" className="w-[260px]" /></BottomRow></>;
   const servings = state.gourmet.servings[id] ?? r.servings;
   const deselected = new Set(state.gourmet.deselected[id] ?? []);
   const ings = scaleIngredients(r.ingredients, r.servings, servings);
   const selected = ings.filter((i) => !deselected.has(i.name)).length;
+  const saved = state.gourmet.saved.some((x) => x.id === id);
   return (
     <>
-      <h2 className="lens-title is-wrap" style={{ fontSize: 36 }}>{r.title}</h2>
-      <p className="lens-sub">{r.minutes} min · serves {servings} · {selected} of {ings.length} selected · {r.source === "sample" ? "sample" : "suggested"} recipe</p>
-      <Rows render={(a) => { const i = Number(a.id.split("-")[1]); const ing = ings[i]; const on = !deselected.has(ing.name); return (<><span className={clsx("lens-check", on && "is-on")}>{on && <Check aria-hidden />}</span><div className="lens-row-main"><div className="lens-row-label">{ing.name}</div></div><div className="lens-row-aside">{formatAmounts([{ quantity: ing.quantity, unit: ing.unit }])}</div></>); }} />
+      <p className="absolute top-[72px] right-11 left-11 truncate text-[36px] leading-tight font-semibold tracking-[-0.02em]">{r.title}</p>
+      <div className="absolute top-[122px] right-11 left-11 flex items-center gap-4">
+        <p className="min-w-0 flex-1 text-[21px] text-white/55">{r.minutes} min · {r.source === "sample" ? "sample" : "suggested"} recipe</p>
+        <Act id="servings-down" label="Fewer servings" className="flex size-[60px] items-center justify-center rounded-full ring-2 ring-white/45"><Minus className="size-[28px]" aria-hidden /></Act>
+        <span className="w-[86px] text-center text-[22px] leading-tight text-white/70"><b className="block text-[34px] text-white tabular-nums">{servings}</b>serves</span>
+        <Act id="servings-up" label="More servings" className="flex size-[60px] items-center justify-center rounded-full ring-2 ring-white/45"><Plus className="size-[28px]" aria-hidden /></Act>
+      </div>
+      <p className="absolute top-[190px] left-11 text-[18px] text-white/55">{selected} of {ings.length} selected · uncheck what you already have</p>
+      <RowList
+        ids={ings.map((_, i) => `ing-${i}`)}
+        rowHeight={56}
+        gap={6}
+        top={230}
+        bottom={184}
+        renderRow={(rowId, i) => {
+          const ing = ings[i];
+          const on = !deselected.has(ing.name);
+          return (
+            <Act id={rowId} className="flex size-full items-center gap-4 rounded-[18px] px-4 text-left">
+              <span aria-hidden className={clsx("flex size-[34px] shrink-0 items-center justify-center rounded-[10px] ring-[3px]", on ? "ring-transparent" : "ring-white/45")} style={on ? { background: BLUE } : undefined}>
+                {on && <Check className="size-[24px] text-[#0d1a2a]" strokeWidth={3} />}
+              </span>
+              <span className={clsx("min-w-0 flex-1 truncate text-[26px] font-medium", !on && "text-white/45 line-through")}>{ing.name}</span>
+              <span className="text-[24px] text-white/65 tabular-nums">{formatAmounts([{ quantity: ing.quantity, unit: ing.unit }])}</span>
+            </Act>
+          );
+        }}
+      />
+      <div className="absolute right-11 bottom-[94px] left-11 flex gap-4">
+        <Pill id="add-list" className="h-[76px] flex-[1.5] px-4 text-[26px]" icon={<ListChecks className="size-[28px]" aria-hidden />} />
+        <Pill id="steps" className="h-[76px] flex-1 px-4 text-[26px]" />
+        <Pill id="save-recipe" className="h-[76px] flex-1 px-4 text-[26px]" icon={saved ? <BookmarkCheck className="size-[26px]" aria-hidden /> : <Bookmark className="size-[26px]" aria-hidden />} />
+      </div>
+      <div className="absolute right-11 bottom-[28px] left-11"><Pill id="shop-ingredients" className="h-[50px] w-full text-[22px]" /></div>
     </>
   );
 }
 
-function Steps() {
+/* ── Gourmet: instructions ────────────────────────────────────────────────── */
+
+function GourmetSteps() {
   const { state } = useLens();
   const id = String(state.screen.params?.recipeId ?? "");
   const page = Number(state.screen.params?.page ?? 0);
@@ -661,23 +1261,152 @@ function Steps() {
   const chunk = pages[Math.min(page, pages.length - 1)] ?? [];
   let n = 1;
   for (let i = 0; i < page; i += 1) n += pages[i].filter((s) => !s.startsWith("…")).length;
+  const first = n;
+  const servings = state.gourmet.servings[id] ?? r.servings;
   return (
-    <div>
-      <p className="lens-sub">{r.title}</p>
-      <ol style={{ margin: "12px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 14 }}>
-        {chunk.map((s, i) => { const num = s.startsWith("…") ? null : n++; return <li key={i} style={{ display: "grid", gridTemplateColumns: "48px 1fr", gap: 12, fontSize: 25, lineHeight: 1.3 }}><span style={{ color: "var(--lens-accent)", fontWeight: 700 }}>{num ?? ""}</span><span>{s}</span></li>; })}
-      </ol>
-    </div>
+    <>
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className="truncate text-[28px] font-semibold">{r.title}</p>
+        <p className="mt-3 text-[21px]" style={{ color: BLUE }}>
+          {chunk.length ? `Step ${first} of ${r.steps.length}` : "No instructions available"} · serves {servings}
+        </p>
+        <div className="mt-5 flex gap-1.5" aria-hidden>
+          {pages.map((_, i) => <span key={i} className="h-1 flex-1 rounded-full" style={{ background: i <= page ? BLUE : "#ffffff30" }} />)}
+        </div>
+        <ol className="mt-6 space-y-4" aria-live="polite">
+          {chunk.map((s, i) => {
+            const num = s.startsWith("…") ? null : n++;
+            return (
+              <li key={i} className="flex gap-4 text-[28px] leading-[1.3] font-medium">
+                {chunk.length > 1 && <span className="w-[30px] shrink-0 font-bold" style={{ color: BLUE }}>{num ?? ""}</span>}
+                <span className="min-w-0 break-words">{s}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <BottomRow>
+        <Pill id="prev" className="flex-1 text-[26px]" />
+        <Pill id="next" className="flex-1 text-[26px]" />
+        <Pill id="done" className="flex-1 text-[26px]" />
+      </BottomRow>
+    </>
   );
 }
 
-function Added() {
+/* ── Gourmet: shop ingredients (live listings for whichever is chosen) ────── */
+
+function GourmetShop() {
   const { state } = useLens();
-  const left = state.list.filter((i) => !i.done).length;
-  return <Center><div className="lens-badge is-ok"><Check aria-hidden /></div><h2 className="lens-title">Added to shopping list</h2><p className="lens-sub">{left} item{left === 1 ? "" : "s"} planned · ticks off in Grocery</p></Center>;
+  const r = recipeOf(state, String(state.screen.params?.recipeId ?? ""));
+  if (!r) return <><Center><p className={clsx("text-[34px]", HEADLINE)}>Recipe not found</p></Center><BottomRow><Pill id="back" className="w-[260px]" /></BottomRow></>;
+  return (
+    <>
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className={clsx("text-[36px]", HEADLINE)}>Shop ingredients</p>
+        <p className="mt-1 text-[22px] text-white/60">Choose an ingredient for online listings</p>
+      </div>
+      <RowList
+        ids={r.ingredients.map((_, i) => `shop-${i}`)}
+        rowHeight={76}
+        top={206}
+        bottom={48}
+        renderRow={(id, i) => (
+          <Act id={id} className="flex size-full items-center gap-3 rounded-[22px] bg-white/[0.07] px-5 text-left">
+            <span className="min-w-0 flex-1 truncate text-[27px] font-semibold">{r.ingredients[i].name}</span>
+            <span className="text-[22px] text-white/60">{formatAmounts([{ quantity: r.ingredients[i].quantity, unit: r.ingredients[i].unit }])}</span>
+          </Act>
+        )}
+      />
+    </>
+  );
 }
 
-// ── Wallet ───────────────────────────────────────────────────────────────────
+/* ── Gourmet: added to the planned shopping list ──────────────────────────── */
+
+function GourmetAdded() {
+  const { state } = useLens();
+  const { action: stores } = useAction("stores");
+  const left = state.list.filter((i) => !i.done).length;
+  return (
+    <>
+      <Center className="pb-[70px]">
+        <CircleCheck className="size-[88px] text-black" style={{ fill: "#93e4b0" }} strokeWidth={1.6} aria-hidden />
+        <p className="mt-6 text-[42px] leading-tight font-semibold tracking-[-0.02em]" role="status">Added to shopping list</p>
+        <p className="mt-3 text-[25px] text-white/60">{left} item{left === 1 ? "" : "s"} planned · ticks off in Grocery</p>
+      </Center>
+      <div className="absolute right-11 bottom-11 left-11 flex flex-col gap-4">
+        <Pill id="shop-list" className="h-[76px] w-full" icon={<ListChecks className="size-[28px]" aria-hidden />} />
+        <div className="flex gap-4">
+          {stores ? <Pill id="stores" className="h-[72px] flex-[1.4] text-[26px]" /> : <Pill id="shop-ingredients" className="h-[72px] flex-[1.4] text-[26px]" />}
+          <Pill id="done" className="h-[72px] flex-1 text-[26px]" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ── Places ───────────────────────────────────────────────────────────────── */
+
+function StoresNearby() {
+  const { state } = useLens();
+  const stores = storesByDistance(state.location.lat, state.location.lng, STORES).slice(0, 4);
+  const ids = [...(state.location.source === "demo" ? ["locate"] : []), ...stores.map((s) => `store-${s.id}`)];
+  return (
+    <>
+      <div className="absolute top-[100px] right-11 left-11">
+        <p className={clsx("text-[38px]", HEADLINE)}>Stores near you</p>
+        <p className="mt-0.5 truncate text-[21px] text-white/50">{state.location.source === "demo" ? "From U District (demo)" : "From your location"} · sample stores · stock unknown</p>
+      </div>
+      <RowList
+        ids={ids}
+        rowHeight={84}
+        top={208}
+        bottom={40}
+        renderRow={(id) => {
+          if (id === "locate") return <QuietRow id={id}><LocateFixed className="size-[28px]" aria-hidden /> Use my location</QuietRow>;
+          const store = stores.find((s) => `store-${s.id}` === id);
+          if (!store) return null;
+          return (
+            <Act id={id} className="flex size-full items-center gap-4 rounded-[24px] bg-white/[0.07] px-6 text-left">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[28px] leading-tight font-semibold">{store.name}</span>
+                <span className="block truncate text-[19px] text-white/55">{store.address}</span>
+              </span>
+              <span className="text-[24px] font-semibold tabular-nums" style={{ color: BLUE }}>{store.km.toFixed(1)} km</span>
+            </Act>
+          );
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * Directions. Web apps on the glasses can't open Maps, so the directions link goes to the
+ * wearer's phone (the Glance app shows a notification that opens it).
+ */
+function NavHandoff() {
+  const { state } = useLens();
+  const store = STORES.find((s) => s.id === state.screen.params?.storeId);
+  const status = state.handoff.kind === "nav" ? state.handoff.status : "sending";
+  return (
+    <>
+      <Center>
+        <Navigation className="size-[72px]" style={{ color: BLUE }} strokeWidth={1.7} aria-hidden />
+        <p className="mt-5 text-[46px] leading-tight font-semibold tracking-[-0.025em]">{store?.name ?? "Directions"}</p>
+        {store && <p className="mt-1 line-clamp-1 text-[26px] text-white/70 tabular-nums">{km(state.location.lat, state.location.lng, store.lat, store.lng).toFixed(1)} km · {store.address}</p>}
+        <p className={clsx("mt-5 flex items-center gap-2.5 text-[23px] font-medium", status === "failed" ? "text-[#ffc266]" : "text-white/70")} role="status">
+          <Smartphone className="size-[24px]" aria-hidden />
+          {status === "sent" ? "Directions sent to your phone" : status === "queued" ? "Open Glance on your phone for directions" : status === "failed" ? "Couldn’t reach your phone" : "Sending to your phone…"}
+        </p>
+      </Center>
+      <BottomRow><Pill id="done" className="w-[260px]" /></BottomRow>
+    </>
+  );
+}
+
+/* ── Wallet (one-time setup on the phone; buy in lens after) ──────────────── */
 
 function WalletTray() {
   const { state } = useLens();
@@ -685,55 +1414,137 @@ function WalletTray() {
   if (w.status === "ready") {
     return (
       <>
-        <div className="lens-card" style={{ gridTemplateColumns: "1fr auto", display: "grid", alignItems: "center" }}>
-          <div><div style={{ fontSize: 30, fontWeight: 700 }}>{w.brand ?? "Card"} •• {w.last4}</div><div className="lens-sub">Ready · saved with Stripe</div></div>
-          <span className="lens-tag is-pay">Ready</span>
+        <div className="absolute top-[86px] right-11 left-11 flex items-center gap-5 rounded-[26px] bg-white/[0.07] px-6 py-5">
+          <span className="flex size-[64px] shrink-0 items-center justify-center rounded-[18px]" style={{ background: BLUE }} aria-hidden><Wallet className="size-[34px] text-[#0d1a2a]" strokeWidth={2.2} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[32px] leading-tight font-bold tabular-nums">{w.brand ?? "Card"} •• {w.last4}</span>
+            <span className="block truncate text-[20px] text-white/55">Ready · saved with Stripe{w.email ? ` · ${w.email}` : ""}</span>
+          </span>
         </div>
-        <Rows />
+        <RowList ids={["w-orders", "w-autobuy"]} rowHeight={84} top={232} bottom={150} renderRow={(id) => <WalletRow id={id} />} />
+        <BottomRow><Pill id="w-done" className="w-[260px]" /></BottomRow>
+      </>
+    );
+  }
+  const checking = w.status === "unknown";
+  return (
+    <>
+      <Center>
+        {checking ? <Spinner /> : <Wallet className="size-[76px]" style={{ color: BLUE }} strokeWidth={1.6} aria-hidden />}
+        <p className={clsx("mt-6 text-[40px] leading-tight", HEADLINE)}>{w.status === "signed-out" ? "Set up your wallet" : w.status === "not-ready" ? "No saved card yet" : "Checking your wallet…"}</p>
+        <p className="mt-3 max-w-[480px] text-[24px] leading-snug text-white/60">One-time setup on your phone. Card details stay with Stripe.</p>
+      </Center>
+      <BottomRow>
+        <Pill id="w-setup" className="flex-[1.5]" icon={<Smartphone className="size-[28px]" aria-hidden />} />
+        <Pill id="w-refresh" className="flex-1" />
+      </BottomRow>
+    </>
+  );
+}
+
+function WalletRow({ id }: { id: string }) {
+  const { action } = useAction(id);
+  return (
+    <Act id={id} className="flex size-full items-center gap-4 rounded-[24px] bg-white/[0.05] px-6 text-left">
+      {id === "w-orders" ? <Receipt className="size-[28px] shrink-0 text-white/70" aria-hidden /> : <Sparkles className="size-[28px] shrink-0" style={{ color: BLUE }} aria-hidden />}
+      <span className="min-w-0 flex-1 truncate text-[28px] font-semibold">{action?.label}</span>
+      <span className="max-w-[200px] truncate text-[21px] text-white/55">{action?.hint}</span>
+    </Act>
+  );
+}
+
+function WalletOrders() {
+  const { state } = useLens();
+  const orders = state.wallet.orders;
+  if (!orders.length) {
+    return (
+      <>
+        <Center>
+          <Receipt className="size-[68px] text-white/40" strokeWidth={1.6} aria-hidden />
+          <p className={clsx("mt-5 text-[38px]", HEADLINE)}>No orders yet</p>
+        </Center>
+        <BottomRow><Pill id="back" className="w-[260px]" /></BottomRow>
       </>
     );
   }
   return (
-    <Center>
-      <div className="lens-badge is-pay" style={{ background: "transparent", border: "3px solid rgba(169,205,245,0.8)", color: "#a9cdf5" }}>•••</div>
-      <h2 className="lens-title is-wrap" style={{ fontSize: 34 }}>{w.status === "signed-out" ? "Sign in to use your wallet" : w.status === "not-ready" ? "No saved card yet" : "Checking your wallet…"}</h2>
-      <p className="lens-sub is-wrap">One-time setup happens on your phone. Card details stay with Stripe.</p>
-    </Center>
+    <>
+      <p className={clsx("absolute top-[74px] right-11 left-11 text-[34px]", HEADLINE)}>Orders</p>
+      <RowList
+        ids={orders.map((o) => `order-${o.id}`)}
+        rowHeight={92}
+        top={136}
+        bottom={40}
+        renderRow={(id, i) => {
+          const o = orders[i];
+          return (
+            <Act id={id} className="flex size-full items-center gap-4 rounded-[26px] bg-white/[0.07] px-6 text-left">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[27px] leading-tight font-semibold">{o.merchantName}</span>
+                <span className="block truncate text-[19px] text-white/55">{o.lines[0]?.name ?? "Order"} · {o.status}</span>
+              </span>
+              <span className="text-[28px] font-bold tabular-nums">{formatCents(o.totalCents)}</span>
+            </Act>
+          );
+        }}
+      />
+    </>
   );
 }
 
 function OrderReceipt() {
   const { state } = useLens();
-  const id = String(state.screen.params?.orderId ?? "");
-  const o = state.wallet.orders.find((x) => x.id === id);
-  if (!o) return <Center><p className="lens-sub">Order not found</p></Center>;
+  const o = state.wallet.orders.find((x) => x.id === state.screen.params?.orderId);
+  if (!o) return <><Center><p className={clsx("text-[34px]", HEADLINE)}>Order not found</p></Center><BottomRow><Pill id="done" className="w-[260px]" /></BottomRow></>;
   return (
-    <div>
-      <div className="lens-figure is-mid">{formatCents(o.totalCents)}</div>
-      <p className="lens-sub">{o.merchantName} · Ref {o.reference}</p>
-      <div className="lens-card" style={{ fontSize: 23 }}>
-        {o.lines.slice(0, 3).map((l) => <Row key={l.name} k={`${l.quantity} × ${l.name}`} v={formatCents(l.lineTotalCents)} />)}
-        <Row k="Payment" v={o.paymentStatus} /><Row k="Fulfillment" v={o.fulfillmentStatus} />
+    <>
+      <div className="absolute top-[78px] right-11 left-11">
+        <Eyebrow>Receipt · Ref {o.reference}</Eyebrow>
+        <p className="mt-1 text-[72px] leading-none font-bold tracking-[-0.045em] tabular-nums">{formatCents(o.totalCents)}</p>
+        <p className="mt-2 truncate text-[23px] text-white/60">{o.merchantName}{o.cardSummary ? ` · ${o.cardSummary}` : ""}</p>
+        <ul className="mt-5 space-y-1.5 text-[23px]">
+          {o.lines.slice(0, 3).map((l) => (
+            <li key={l.name} className="flex justify-between gap-4"><span className="truncate text-white/80">{l.quantity} × {l.name}</span><span className="tabular-nums">{formatCents(l.lineTotalCents)}</span></li>
+          ))}
+          <li className="flex justify-between gap-4 pt-1 text-white/55"><span>Payment</span><span>{o.paymentStatus}</span></li>
+          <li className="flex justify-between gap-4 text-white/55"><span>Fulfillment</span><span>{o.fulfillmentStatus}</span></li>
+        </ul>
       </div>
-      <p className="lens-sub" style={{ fontSize: 19, marginTop: 8 }}>{o.cardSummary ?? ""} · Payments by Stripe · sandbox</p>
-    </div>
+      <BottomRow><Pill id="done" className="w-[260px]" /></BottomRow>
+    </>
   );
 }
 
-// ── Composer ─────────────────────────────────────────────────────────────────
+/* ── Composer: typing with the D-pad (the glasses have no keyboard) ───────── */
 
 function Composer() {
-  const { state, actions, focusId, activate } = useLens();
+  const { state, actions } = useLens();
   const c = state.composer!;
   const keys = actions.filter((a) => a.id.startsWith("key-") && !["key-page", "key-delete", "key-done", "key-cancel"].includes(a.id));
-  const wide = actions.filter((a) => a.id === "key-page" || a.id === "key-delete");
+  const price = c.field.startsWith("price");
   return (
-    <div>
-      <div className="lens-field" style={{ borderRadius: 18 }}>{c.value ? c.value : <span className="is-placeholder">{c.field.startsWith("price") ? "Price in dollars" : "Type to search"}</span>}<span className="is-caret" aria-hidden /></div>
-      <div className="lens-keys" role="group" aria-label="Keys">
-        {keys.map((a) => <button key={a.id} type="button" className={clsx("lens-key", focusId === a.id && "is-focused")} data-action-id={a.id} onClick={() => activate(a.id)}>{a.label}</button>)}
-        {wide.map((a) => <button key={a.id} type="button" className={clsx("lens-key is-wide", focusId === a.id && "is-focused")} data-action-id={a.id} onClick={() => activate(a.id)}>{a.label}</button>)}
+    <>
+      <div className="absolute top-[36px] right-11 left-11 flex h-[76px] items-center rounded-full px-8 text-[32px] ring-[3px] ring-[#A9CDF5]/80">
+        <span className={clsx("truncate", !c.value && "text-white/45")}>{c.value || (price ? "Price in dollars" : "Type to search")}</span>
+        <span className="glance-caret ml-1 inline-block h-[36px] w-[3px] shrink-0 rounded-full" style={{ background: BLUE }} aria-hidden />
       </div>
-    </div>
+      <div className="absolute top-[140px] right-9 left-9 grid grid-cols-7 gap-2.5" role="group" aria-label="Keys">
+        {keys.map((a) => (
+          <Act key={a.id} id={a.id} className="flex h-[64px] items-center justify-center rounded-[18px] bg-white/[0.08] text-[32px] font-semibold">{a.label}</Act>
+        ))}
+      </div>
+      <div className="absolute top-[300px] right-9 left-9 flex gap-2.5">
+        <Act id="key-page" className="flex h-[64px] flex-1 items-center justify-center rounded-[18px] bg-white/[0.08] text-[24px] font-semibold">
+          {c.page + 1} of 3 · More keys
+        </Act>
+        <Act id="key-delete" label="Delete" className="flex h-[64px] flex-1 items-center justify-center gap-2 rounded-[18px] bg-white/[0.08] text-[24px] font-semibold">
+          <Delete className="size-[28px]" aria-hidden /> Delete
+        </Act>
+      </div>
+      <BottomRow>
+        <Pill id="key-done" className="flex-1" />
+        <Pill id="key-cancel" className="flex-1" />
+      </BottomRow>
+    </>
   );
 }

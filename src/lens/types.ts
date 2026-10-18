@@ -93,6 +93,8 @@ export interface GroceryState {
   heldPrice?: { cents: number; source: "shelf-label" | "estimate" } | null;
   pendingAsk: { eventId: string; productKey: string; label: string; packageSize: string | null; priceCents: number | null } | null;
   insights: Record<string, { status: AsyncStatus; data: ItemInsight | null }>;
+  /** Live online prices per item, from the listing search (live sources only). */
+  online?: Record<string, { status: AsyncStatus; offers: Offer[] }>;
   nudgedKeys: string[];
   lastAddKey: string | null;
   acknowledgement: string | null;
@@ -225,6 +227,7 @@ export type LensEvent =
   | { type: "grocery/price"; productKey: string; cents: number | null }
   | { type: "grocery/undo" }
   | { type: "grocery/insight"; productKey: string; status: AsyncStatus; data?: ItemInsight | null }
+  | { type: "grocery/online"; productKey: string; status: AsyncStatus; offers: Offer[] }
   | { type: "grocery/finish" }
   | { type: "grocery/bought"; retailer: string; name: string; priceCents: number; url: string }
   | { type: "grocery/store-entry"; store: string | null }
@@ -281,6 +284,7 @@ export type LensEffect =
   | { kind: "gourmet-scan" }
   | { kind: "gourmet-recipes"; dish: string }
   | { kind: "grocery-insight"; productKey: string; label: string; packageSize: string | null }
+  | { kind: "grocery-online"; productKey: string; query: string }
   | { kind: "grocery-exit" }
   | { kind: "listings-search"; query: string }
   | { kind: "handoff"; handoffKind: NonNullable<HandoffState["kind"]>; title: string; url: string }
