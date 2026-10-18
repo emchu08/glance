@@ -60,6 +60,8 @@ final class AppModel {
         didSet { UserDefaults.standard.set(phoneView.rawValue, forKey: AppModel.phoneViewKey) }
     }
     private static let phoneViewKey = "glance.phoneView.v1"
+    /// What the glasses camera is doing until it delivers frames ("waiting for the glasses", "paused"…).
+    var cameraStatus = ""
     /// The newest glasses camera frame, for the phone's Camera view (about 15 a second).
     var cameraPreview: UIImage?
     private var lastPreview = Date.distantPast
@@ -103,6 +105,11 @@ final class AppModel {
             if state == .sessionExpired { self.reportError("Glasses disconnected. Tap Reconnect.") }
         }
         transport.onCapabilities = { [weak self] c in Task { @MainActor in self?.capabilities = c; self?.log("Capabilities: camera=\(c.camera), display=\(c.display), controls=\(c.input)") } }
+        transport.onCameraStatus = { [weak self] status in
+            guard let self, status != self.cameraStatus else { return }
+            self.cameraStatus = status
+            self.log("Camera: \(status)")
+        }
         transport.onFrame = { [weak self] jpeg, w, h in
             guard let self else { return }
             let now = Date()

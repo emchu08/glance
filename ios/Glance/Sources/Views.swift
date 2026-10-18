@@ -46,6 +46,8 @@ struct LauncherView: View {
                     }
 
                     if !model.history.isEmpty { LinksCard(blue: blue) }
+
+                    DetailsCard()
                 }
                 .padding(20)
                 .frame(maxWidth: 620)
@@ -67,7 +69,9 @@ private struct ConnectionLine: View {
     var body: some View {
         HStack(spacing: 8) {
             if model.isLaunching { ProgressView().controlSize(.small) }
-            Label(model.cameraLive ? "Glasses connected · camera on" : model.launchStatus,
+            Label(model.cameraLive ? "Glasses connected · camera on"
+                  : !model.isLaunching && !model.cameraStatus.isEmpty && model.errorMessage == nil ? "Glasses camera: \(model.cameraStatus)"
+                  : model.launchStatus,
                   systemImage: model.cameraLive ? "eyeglasses" : "antenna.radiowaves.left.and.right")
         }
         .font(.footnote).foregroundStyle(blue)
@@ -85,8 +89,9 @@ private struct CameraPreview: View {
                 if let image = model.cameraPreview, model.cameraLive {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
-                    Label(model.isLaunching ? "Starting the glasses camera…" : "Glasses camera off", systemImage: "video.slash")
+                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Starting the glasses camera…" : "Glasses camera off") : "Camera: \(model.cameraStatus)", systemImage: "video.slash")
                         .font(.callout).foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center).padding()
                 }
             }
             .clipped()
@@ -114,6 +119,30 @@ private struct ConnectionCard: View {
                 }.disabled(model.isLaunching).accessibilityIdentifier("open-glance")
             }
         }
+    }
+}
+
+/// The recent connection steps, for when something won't connect.
+private struct DetailsCard: View {
+    @Environment(AppModel.self) private var model
+    @State private var copied = false
+    var body: some View {
+        DisclosureGroup("Details") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(model.developerLog.suffix(30).joined(separator: "\n"))
+                    .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                Button(copied ? "Copied" : "Copy details") {
+                    UIPasteboard.general.string = model.developerLog.suffix(60).joined(separator: "\n")
+                    copied = true
+                }
+                .font(.footnote)
+            }
+            .padding(.top, 6)
+        }
+        .font(.footnote).tint(.secondary)
+        .accessibilityIdentifier("details")
     }
 }
 

@@ -15,6 +15,7 @@ final class DATTransport: GlassesTransport {
     var onFrame: ((Data, Int, Int) -> Void)?
     var onError: ((String) -> Void)?
     var onControl: (@MainActor @Sendable (String, LensBridge.PublishedState) -> Void)?
+    var onCameraStatus: ((String) -> Void)?
 
     private var configured = false
     private var session: DeviceSession?
@@ -36,12 +37,15 @@ final class DATTransport: GlassesTransport {
     private var displayWait: AsyncStream<DisplayState>.Continuation?
     private var frameToken: AnyListenerToken?
     private var cameraErrorToken: AnyListenerToken?
+    private var cameraStreamStateToken: AnyListenerToken?
+    private var cameraStateToken: AnyListenerToken?
+    private var cameraWatchdog: Task<Void, Never>?
+    private var cameraFramesReceived = 0
     private var encodingFrame = false
     private var cameraFrameCount = 0
     private var cameraMeasurementStart = Date()
     private static let logger = Logger(subsystem: "com.glance.companion", category: "performance")
     private struct EncodedFrame: Sendable { let jpeg: Data; let width: Int; let height: Int }
-    static let cameraFrameRate: UInt = 2
     private var lastSentDigest: Data?
 
     private func configure() throws {
@@ -207,14 +211,30 @@ final class DATTransport: GlassesTransport {
                 throw TransportError.message("Camera permission was denied in Meta AI.")
             }
         }
-        // Camera and display share one Bluetooth Classic link. Recognition reads at most one frame every few
-        // seconds, so 2 fps (the lowest valid rate) keeps a fresh frame while leaving the link to display updates.
-        // At this rate the link affords the medium resolution, which reads labels better than low.
-        guard let capability = try session.addCamera(config: StreamConfiguration(videoCodec: .raw, resolution: .medium, frameRate: Self.cameraFrameRate)) else {
+        // Start from the setup that last delivered frames on this phone.
+        let first = min(UserDefaults.standard.integer(forKey: Self.cameraConfigKey), Self.cameraConfigs.count - 1)
+        try await startCameraStream(on: session, config: first, restarted: false)
+    }
+
+    /// Camera setups, best first. Camera and display share one Bluetooth Classic link, and recognition
+    /// reads at most one frame every few seconds, so 2 fps at medium resolution leaves the link to display
+    /// updates and reads labels well. Low at 24 fps is Meta's documented default, used if that delivers nothing.
+    private static let cameraConfigs: [(label: String, config: StreamConfiguration)] = [
+        ("medium · 2 fps", StreamConfiguration(videoCodec: .raw, resolution: .medium, frameRate: 2)),
+        ("low · 24 fps", StreamConfiguration(videoCodec: .raw, resolution: .low, frameRate: 24)),
+    ]
+    private static let cameraConfigKey = "glance.cameraConfig.v1"
+
+    /// Adds the camera, waits for it to start (like the display), then starts its stream. A watchdog
+    /// restarts the stream once, then moves to the next setup, if no frame arrives.
+    private func startCameraStream(on session: DeviceSession, config index: Int, restarted: Bool) async throws {
+        let setup = Self.cameraConfigs[index]
+        onCameraStatus?("starting (\(setup.label))")
+        guard let capability = try session.addCamera(config: setup.config) else {
             throw TransportError.message("Camera unavailable. Reconnect the glasses.")
         }
         camera = capability
-        cameraFrameCount = 0; cameraMeasurementStart = Date()
+        cameraFrameCount = 0; cameraMeasurementStart = Date(); cameraFramesReceived = 0
         frameToken = capability.stream.videoFramePublisher.listen { [weak self] frame in
             Task { @MainActor in
                 guard let self, self.camera === capability, !self.encodingFrame else { return }
@@ -226,6 +246,11 @@ final class DATTransport: GlassesTransport {
                     return EncodedFrame(jpeg: jpeg, width: Int(image.size.width * image.scale), height: Int(image.size.height * image.scale))
                 }.value
                 guard self.camera === capability, let encoded else { return }
+                if self.cameraFramesReceived == 0 {
+                    UserDefaults.standard.set(index, forKey: Self.cameraConfigKey)
+                    self.onCameraStatus?("streaming (\(setup.label))")
+                }
+                self.cameraFramesReceived += 1
                 self.onFrame?(encoded.jpeg, encoded.width, encoded.height)
                 self.cameraFrameCount += 1
                 let elapsed = Date().timeIntervalSince(self.cameraMeasurementStart)
@@ -235,17 +260,83 @@ final class DATTransport: GlassesTransport {
                 }
             }
         }
+        cameraStreamStateToken = capability.stream.statePublisher.listen { [weak self] state in
+            Task { @MainActor in
+                guard let self, self.camera === capability, self.cameraFramesReceived == 0 || state != .streaming else { return }
+                self.onCameraStatus?(Self.describe(state))
+            }
+        }
         cameraErrorToken = capability.stream.errorPublisher.listen { [weak self] error in
             Task { @MainActor in self?.onError?(error.localizedDescription) }
         }
+
+        // The camera starts itself once added; a stream started before then can be ignored.
+        if capability.state != .started {
+            let (states, continuation) = AsyncStream.makeStream(of: CameraState.self)
+            cameraStateToken = capability.statePublisher.listen { continuation.yield($0) }
+            let timeout = Task { try? await Task.sleep(for: .seconds(10)); continuation.finish() }
+            for await state in states where state == .started || state == .stopped { break }
+            timeout.cancel()
+            continuation.finish()
+            guard camera === capability else { return }
+            if capability.state != .started { onCameraStatus?("camera didn’t start; starting the stream anyway") }
+        }
         capability.stream.start()
+
+        cameraWatchdog?.cancel()
+        cameraWatchdog = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(10)) } catch { return }
+            guard let self, self.camera === capability, self.cameraFramesReceived == 0 else { return }
+            if !restarted {
+                // Once: stop and start the same stream.
+                self.onCameraStatus?("no picture yet; restarting the stream")
+                capability.stream.stop()
+                capability.stream.start()
+                self.cameraWatchdog = Task { [weak self] in
+                    do { try await Task.sleep(for: .seconds(10)) } catch { return }
+                    guard let self, self.camera === capability, self.cameraFramesReceived == 0 else { return }
+                    await self.nextCameraSetup(after: index, on: session)
+                }
+                return
+            }
+            await self.nextCameraSetup(after: index, on: session)
+        }
+    }
+
+    private func nextCameraSetup(after index: Int, on session: DeviceSession) async {
+        stopCamera()
+        let next = index + 1
+        guard next < Self.cameraConfigs.count else {
+            onCameraStatus?("no picture from the glasses camera")
+            onError?("The glasses camera isn’t sending pictures. Check the glasses are on your face and not too warm, then tap Reconnect.")
+            return
+        }
+        do { try await startCameraStream(on: session, config: next, restarted: true) }
+        catch { onError?(error.localizedDescription) }
+    }
+
+    private static func describe(_ state: StreamState) -> String {
+        switch state {
+        case .waitingForDevice: return "waiting for the glasses (wear them, hinges open)"
+        case .starting: return "starting"
+        case .streaming: return "streaming"
+        case .paused: return "paused by the glasses"
+        case .stopping: return "stopping"
+        case .stopped: return "stopped"
+        @unknown default: return "unknown"
+        }
     }
 
     func stopCamera() {
+        cameraWatchdog?.cancel()
+        cameraWatchdog = nil
+        camera?.stream.stop()
         camera?.stop()
         camera = nil
         frameToken = nil
         cameraErrorToken = nil
+        cameraStreamStateToken = nil
+        cameraStateToken = nil
     }
 
     private func startInputs(on session: DeviceSession) async throws {

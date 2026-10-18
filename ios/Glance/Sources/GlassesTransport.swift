@@ -14,6 +14,8 @@ protocol GlassesTransport: AnyObject {
     var onError: ((String) -> Void)? { get set }
     var onControl: (@MainActor @Sendable (String, LensBridge.PublishedState) -> Void)? { get set }
     var onFrame: ((Data, Int, Int) -> Void)? { get set }
+    /// What the glasses camera is doing, in a few words, until it delivers frames.
+    var onCameraStatus: ((String) -> Void)? { get set }
     func register(appID: String, clientToken: String) async throws
     func handleCallback(_ url: URL)
     func startCamera() async throws
@@ -44,6 +46,7 @@ final class PhoneCameraTransport: NSObject, GlassesTransport, AVCaptureVideoData
     var onFrame: ((Data, Int, Int) -> Void)?
     var onError: ((String) -> Void)?
     var onControl: (@MainActor @Sendable (String, LensBridge.PublishedState) -> Void)?
+    var onCameraStatus: ((String) -> Void)?
     private let session = AVCaptureSession()
     private var lastSent = Date.distantPast
     private let queue = DispatchQueue(label: "glance.camera")
