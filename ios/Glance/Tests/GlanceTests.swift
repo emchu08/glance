@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 import WebKit
 import MWDATInputs
 @testable import Glance
@@ -121,6 +122,56 @@ final class GlanceTests: XCTestCase {
         let fractional = #"{"instance":"i","revision":4,"screen":"grocery","active":"scan","actions":[{"id":"scan","label":"Start scan","row":1.5,"x":0.82,"variant":"secondary","rect":null}]}"#
         XCTAssertEqual(try JSONDecoder().decode(LensBridge.PublishedState.self, from: Data(fractional.utf8)).active, "scan")
     }
+}
+
+@MainActor
+final class CameraOnDemandTests: XCTestCase {
+    func testCameraTurnsOnForScansAndOffWhenTheyStop() async throws {
+        let glasses = FakeGlasses()
+        let model = AppModel(transport: glasses)
+        model.cameraIdleSeconds = 0.3
+        model.cameraDemanded()
+        XCTAssertEqual(glasses.resumes, 0, "Never on before the camera is ready")
+
+        model.cameraReady = true
+        model.cameraDemanded()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(glasses.resumes, 1, "A scan turns the camera on")
+        // Grocery asks again every few seconds: one camera start, kept on.
+        for _ in 0..<3 {
+            try await Task.sleep(for: .milliseconds(150))
+            model.cameraDemanded()
+        }
+        XCTAssertEqual(glasses.resumes, 1)
+        XCTAssertEqual(glasses.pauses, 0, "Stays on while scans keep asking")
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(glasses.pauses, 1, "Off once scans stop asking")
+
+        model.cameraDemanded()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(glasses.resumes, 2, "The next scan turns it on again")
+    }
+}
+
+@MainActor
+private final class FakeGlasses: GlassesTransport {
+    let name = "fake"
+    var onState: ((AppModel.ConnectionState) -> Void)?
+    var onCapabilities: ((DeviceCapabilities) -> Void)?
+    var onError: ((String) -> Void)?
+    var onControl: (@MainActor @Sendable (String, LensBridge.PublishedState) -> Void)?
+    var onFrame: ((Data, Int, Int) -> Void)?
+    var onCameraStatus: ((String) -> Void)?
+    var resumes = 0, pauses = 0
+    func register(appID: String, clientToken: String) async throws {}
+    func handleCallback(_ url: URL) {}
+    func startCamera() async throws {}
+    func resumeCamera() async throws { resumes += 1 }
+    func pauseCamera() { pauses += 1 }
+    func stopCamera() {}
+    func startDisplay() async throws {}
+    func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool { true }
+    func reset() {}
 }
 
 @MainActor

@@ -43,7 +43,7 @@ const fs = require('node:fs');
     await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Starting the glasses camera'));
     assert.ok(!/pair code/i.test(await lensText()), 'No relay pair code inside the companion');
     await page.evaluate(() => { window.frameAvailable = true; window.glanceCompanion.camera({ ready: true }); });
-    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera live'));
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera ready'));
 
     // Grocery says each thing once; the companion adds nothing to the page.
     await page.locator('[data-action-id="mode-grocery"]').click();

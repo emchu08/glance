@@ -18,7 +18,10 @@ protocol GlassesTransport: AnyObject {
     var onCameraStatus: ((String) -> Void)? { get set }
     func register(appID: String, clientToken: String) async throws
     func handleCallback(_ url: URL)
+    /// Gets the camera ready without streaming; `resumeCamera`/`pauseCamera` turn it on and off per scan.
     func startCamera() async throws
+    func resumeCamera() async throws
+    func pauseCamera()
     func stopCamera()
     /// Push a rendered 600×600 lens image to the glasses display when supported.
     func startDisplay() async throws
@@ -71,9 +74,10 @@ final class PhoneCameraTransport: NSObject, GlassesTransport, AVCaptureVideoData
         out.setSampleBufferDelegate(self, queue: queue)
         if session.canAddOutput(out) { session.addOutput(out) }
         session.commitConfiguration()
-        queue.async { [session] in session.startRunning() }
         onState?(.sessionActive)
     }
+    func resumeCamera() async throws { queue.async { [session] in session.startRunning() } }
+    func pauseCamera() { queue.async { [session] in session.stopRunning() } }
     func stopCamera() { queue.async { [session] in session.stopRunning() } }
     func startDisplay() async throws {}
     func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool { false }

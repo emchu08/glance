@@ -30,6 +30,10 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
     var onSnapshot: ((UIImage, PublishedState) async -> Bool)?
     var onError: ((String) -> Void)?
     var onWallet: (() -> Void)?
+    /// A scan wants a picture: the camera turns on (it is off between scans).
+    var onCameraDemand: (() -> Void)?
+    /// The camera is ready to turn on for a scan, though not streaming now.
+    private var cameraStandby = false
 
     func makeWebView(url: URL) -> WKWebView {
         if let webView { return webView }
@@ -90,9 +94,10 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
               let body = message.body as? [String: Any] else { replyHandler(nil, "Unsupported page"); return }
         switch body["type"] as? String {
         case "frame":
+            onCameraDemand?()
             Task { @MainActor in
-                // Wait briefly for the first camera frame, never return an old/disconnected one.
-                let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+                // The camera may be just turning on: wait for a fresh frame, never return an old one.
+                let deadline = ContinuousClock.now.advanced(by: .seconds(12))
                 while (cameraFrame == nil || Date().timeIntervalSince(cameraFrame!.at) > 2), ContinuousClock.now < deadline {
                     try? await Task.sleep(for: .milliseconds(50))
                 }
@@ -114,12 +119,14 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
         if cameraReady != true { updateCameraStatus() }
     }
 
-    func clearCamera() { cameraFrame = nil; lastFrameAt = nil; updateCameraStatus(force: true) }
+    func clearCamera() { cameraFrame = nil; lastFrameAt = nil; cameraStandby = false; updateCameraStatus(force: true) }
+    func setCameraStandby(_ on: Bool) { cameraStandby = on; updateCameraStatus(force: true) }
+    /// Ready means a scan can get a picture: streaming now, or on standby to turn on.
     func updateCameraStatus(force: Bool = false) {
-        let ready = lastFrameAt.map { Date().timeIntervalSince($0) < 2 } ?? false
+        let ready = cameraStandby || (lastFrameAt.map { Date().timeIntervalSince($0) < 2 } ?? false)
         guard force || ready != cameraReady else { return }
         cameraReady = ready
-        js("window.glanceCompanion?.camera({ready: \(ready), message: \(jsonString(ready ? "Camera connected" : "Connect your glasses on the phone."))})")
+        js("window.glanceCompanion?.camera({ready: \(ready), message: \(jsonString(ready ? "Camera ready" : "Connect your glasses on the phone."))})")
     }
 
     func walletReturned() { js("window.glanceCompanion?.walletReturned()") }
