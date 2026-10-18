@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --font-serif: var(--font-garamond), "EB Garamond", Georgia, serif;
 
@@ -110,6 +110,33 @@ body {
   font-feature-settings: "tnum" 1, "ss01" 1;
   letter-spacing: 0.01em;
 }
+
+/* Landing page: sky-to-cream daylight, Manrope display over DM Sans. */
+.site-page {
+  --site-blue: #3563e9;
+  --hero-sky:
+    radial-gradient(ellipse at 87% 98%, #fffbe7c9 0%, #fffbe700 48%),
+    radial-gradient(ellipse at 8% 52%, #65c7eb55 0%, #65c7eb00 60%),
+    linear-gradient(175deg, #207bb9 0%, #359ed5 30%, #70c8e3 64%, #c6e9e8 85%, #edf4df 100%);
+  color-scheme: light;
+  background: #e4eeff;
+  color: #203550;
+  font-family: var(--font-dm-sans), Arial, sans-serif;
+}
+.site-page .font-manrope { font-family: var(--font-manrope), Arial, sans-serif; }
+.site-page .eyebrow { display: flex; align-items: center; gap: 8px; font-size: 7px; line-height: 1.5; letter-spacing: 1.4px; font-weight: 600; }
+@media (min-width: 701px) { .site-page .eyebrow { font-size: 9px; } }
+.site-page .blue-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--site-blue); }
+.site-page .btn-site {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 28px;
+  min-height: 47px; padding: 17px 21px; border-radius: 4px;
+  font-size: 13px; font-weight: 500;
+  transition: background 0.2s, transform 0.2s;
+}
+.site-page .btn-site:hover { transform: translateY(-2px); }
+.site-page .btn-site-blue { background: var(--site-blue); color: #fff; box-shadow: 0 5px 20px rgba(36, 92, 255, 0.05); }
+.site-page .btn-site-blue:hover { background: #2c56d8; }
+.site-page :focus-visible { outline: 3px solid var(--site-blue); outline-offset: 4px; }
 
 .measure { max-width: 64ch; }
 .measure-tight { max-width: 46ch; }
