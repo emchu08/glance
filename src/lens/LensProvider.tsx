@@ -57,8 +57,14 @@ export interface LensProviderProps {
   fixture?: boolean;
   initial?: Partial<LensState> | ((s: LensState) => LensState);
   skipIntro?: boolean;
+  /** A relay code to use instead of minting one (the companion app's code, from the URL). */
+  pairCode?: string;
   onLog?: (line: string) => void;
 }
+
+interface CompanionCamera { ready: boolean; message?: string }
+/** Present when the iPhone companion injected its bridge (before any page script ran). */
+const companionBridge = () => (typeof window === "undefined" ? null : (window as unknown as { glanceCompanion?: { cameraState?: CompanionCamera } }).glanceCompanion ?? null);
 
 const WELCOME_HANDOFF_MS = 3900;
 const WELCOME_REDUCED_MS = 2200;
@@ -68,7 +74,7 @@ const TOAST_MS = 2200;
 const ORDER_POLL_MS = 1500;
 const ORDER_POLL_MAX_MS = 90_000;
 
-export function LensProvider({ children, capture = "sample", fixture = false, initial, skipIntro, onLog }: LensProviderProps) {
+export function LensProvider({ children, capture = "sample", fixture = false, initial, skipIntro, pairCode, onLog }: LensProviderProps) {
   const [state, rawDispatch] = useReducer(lensReducer, undefined, () => {
     let s = initialState();
     s.capture = capture;
@@ -110,36 +116,65 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     return () => adapter.stop();
   }, [adapter, state.capture, fixture, dispatch, log]);
 
-  // Pairing code (native source): restore or mint and register with the relay.
+  // Pairing code (native source): the companion's code when given, else restore or mint; register with the relay.
   useEffect(() => {
     if (fixture || state.capture !== "native") return;
     let cancelled = false;
+    // Inside the companion, frames arrive locally, so the status shown is the glasses camera's, not the relay's.
+    const companion = companionBridge();
+    const showCamera = (c: CompanionCamera | undefined) => dispatch({ type: "pairing/set", status: c?.ready ? "connected" : "awaiting-camera" });
+    const onCamera = (e: Event) => showCamera((e as CustomEvent<CompanionCamera>).detail);
+    if (companion) {
+      showCamera(companion.cameraState);
+      window.addEventListener("glance:camera", onCamera);
+    }
     (async () => {
       try {
         const stored = JSON.parse(localStorage.getItem(PAIR_KEY) ?? "null") as { code: string; at: number } | null;
-        const body = stored && Date.now() - stored.at < 5 * 60_000 ? { code: stored.code } : {};
+        const body = pairCode ? { code: pairCode, claim: true } : stored && Date.now() - stored.at < 5 * 60_000 ? { code: stored.code } : {};
         const res = await fetch("/api/relay/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-        const data = (await res.json()) as { code: string };
+        const data = (await res.json()) as { code: string; token: string };
         if (cancelled) return;
         pairingCodes.set(instanceId, data.code);
-        localStorage.setItem(PAIR_KEY, JSON.stringify({ code: data.code, at: Date.now() }));
-        dispatch({ type: "pairing/set", status: "waiting", code: data.code });
+        pairingTokens.set(instanceId, data.token);
+        if (!pairCode) localStorage.setItem(PAIR_KEY, JSON.stringify({ code: data.code, at: Date.now() }));
+        if (companion) dispatch({ type: "pairing/set", status: stateRef.current.pairing.status, code: data.code });
+        else dispatch({ type: "pairing/set", status: "waiting", code: data.code });
       } catch (e) {
         if (!cancelled) dispatch({ type: "pairing/set", status: "unavailable" });
         log(`pairing failed: ${(e as Error).message}`);
       }
     })();
     const poll = setInterval(async () => {
-      if (!pairBox.current) return;
+      if (!pairBox.current || companion) return;
       try {
-        const r = await fetch(`/api/relay/status?code=${pairBox.current}`, { cache: "no-store" });
+        const r = await fetch(`/api/relay/status?code=${pairBox.current}&role=lens`, { cache: "no-store" });
         const s = (await r.json()) as { phone: boolean; frameAgeMs: number | null };
         const status = !s.phone ? "waiting" : s.frameAgeMs === null ? "awaiting-camera" : s.frameAgeMs > 8000 ? "stale" : "connected";
         if (stateRef.current.pairing.status !== status) dispatch({ type: "pairing/set", status });
       } catch { /* keep last status */ }
     }, 2500);
-    return () => { cancelled = true; clearInterval(poll); };
-  }, [state.capture, fixture, dispatch, log, instanceId, pairBox]);
+    return () => { cancelled = true; clearInterval(poll); window.removeEventListener("glance:camera", onCamera); };
+  }, [state.capture, fixture, dispatch, log, instanceId, pairBox, pairCode]);
+
+  // Glasses web app: its browser has its own cookies, so the paired, signed-in phone hands over the account.
+  const walletStatus = state.wallet.status;
+  useEffect(() => {
+    if (fixture || state.capture !== "native" || !pairCode || companionBridge() || walletStatus !== "signed-out") return;
+    let stop = false;
+    const tick = async () => {
+      const token = pairingTokens.get(instanceId);
+      if (stop || !token) return;
+      try {
+        const res = await fetch("/api/auth/glasses", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: pairCode, token }), credentials: "same-origin" });
+        const data = (await res.json()) as { signedIn?: boolean };
+        if (!stop && data.signedIn) { log("signed in from the phone"); dispatch({ type: "wallet/set", wallet: { status: "unknown" } }); }
+      } catch { /* try again on the next tick */ }
+    };
+    const id = setInterval(tick, 3000);
+    tick();
+    return () => { stop = true; clearInterval(id); };
+  }, [fixture, state.capture, pairCode, walletStatus, instanceId, dispatch, log]);
 
   // ── Persistence (saved offers, recipes, list only) ─────────────────────────
   const hydrated = useRef(false);
@@ -158,8 +193,9 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
 
   // ── Reduced motion ─────────────────────────────────────────────────────────
   useEffect(() => {
-    // Glasses receive still snapshots, so a spring caught mid-flight would stay on the display. Native lenses never animate.
-    const native = capture === "native";
+    // Mirroring sends still snapshots, so a spring caught mid-flight would stay on the display; the companion's lens
+    // never animates. The glasses web app renders itself and keeps its motion.
+    const native = capture === "native" && !!companionBridge();
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     dispatch({ type: "init", reducedMotion: native || mq.matches });
     const h = () => dispatch({ type: "init", reducedMotion: native || mq.matches });
@@ -656,5 +692,6 @@ export function useLensInput(enabled = true) {
 }
 
 const pairingCodes = new Map<string, string | null>();
+const pairingTokens = new Map<string, string>();
 
 const bridgeInstance = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `lens-${Date.now()}`;

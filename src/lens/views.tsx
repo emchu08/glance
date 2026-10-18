@@ -189,9 +189,7 @@ function Picker() {
   const modes = actions.filter((a) => a.id.startsWith("mode-"));
   const selected = Math.max(0, modes.findIndex((a) => a.id === focusId));
   const reduced = state.reducedMotion;
-  const source = state.pairing.status === "none"
-    ? (state.capture === "sample" ? "Sample scenario" : state.capture === "webcam" ? "Camera" : "Glasses")
-    : `Glasses ${state.pairing.status === "connected" ? "connected" : state.pairing.status === "waiting" ? `· pair code ${state.pairing.code ?? "…"}` : `· ${state.pairing.status}`}`;
+  const source = cameraLine(state);
   return (
     <div className="lens-wheel" aria-label="Choose a mode">
       <div className="lens-picker-top" aria-hidden>
@@ -219,6 +217,21 @@ function Picker() {
       <div className="lens-status lens-picker-source">{source}</div>
     </div>
   );
+}
+
+/** One line for where frames come from; the glasses camera is the only native source. */
+function cameraLine(state: LensState): string {
+  if (state.capture === "sample") return "Sample scenario";
+  if (state.capture === "webcam") return "Camera";
+  switch (state.pairing.status) {
+    case "connected": return "Glasses camera live";
+    case "awaiting-camera": return "Starting the glasses camera…";
+    case "waiting": return "Open Glance on your phone";
+    case "stale": return "Camera paused · check your phone";
+    case "reconnecting": return "Reconnecting…";
+    case "unavailable": return "Can’t reach Glance";
+    default: return "Glasses";
+  }
 }
 
 /** Wheel geometry on the 600 px lens: the selected row is the outlined box, neighbours tilt away. */
@@ -412,11 +425,15 @@ function GroceryRoot() {
     return <Center><p className="lens-eyebrow">Did this go in your cart?</p><h2 className="lens-title is-wrap">{gr.pendingAsk.label}</h2><p className="lens-sub">{gr.pendingAsk.packageSize ?? ""}</p></Center>;
   }
   if (!gr.cart.length) {
+    // One instruction at a time: what to do next, or why the camera can't help yet.
+    const cameraDown = state.capture === "native" && state.pairing.status !== "connected";
     return (
       <div>
         <div className="lens-figure">{formatCents(0)}</div>
         <p className="lens-sub" style={{ marginTop: 8 }}>0 items</p>
-        <p className="lens-sub is-wrap" style={{ marginTop: 18, fontSize: 22 }}>Hold an item up, then put it in your cart. Seeing or holding never adds by itself.</p>
+        <p className="lens-sub is-wrap" style={{ marginTop: 18, fontSize: 22 }}>
+          {cameraDown ? cameraLine(state) : gr.scanning ? "Hold an item up, then put it in your cart. Seeing or holding never adds by itself." : "Start scan, then hold an item up."}
+        </p>
       </div>
     );
   }

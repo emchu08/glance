@@ -358,20 +358,6 @@
 .lens-wheel-row { color: #fff !important; }
 .lens-wheel-row.is-focused { color: var(--lens-accent) !important; }
 
-/* Companion scan status occupies the existing grocery heading. */
-.glance-native-activity { flex: none; margin-bottom: 10px; padding: 10px 14px; border: 2px solid #a9cdf5; border-radius: 16px; background: #102840; color: white; }
-.glance-native-activity strong { display: block; font-size: 25px; line-height: 1.15; }
-.glance-native-activity span { display: block; margin-top: 4px; font-size: 18px; line-height: 1.2; color: #d8eaff; }
-.lens-body:has(.glance-native-activity) > .lens-title { display: none; }
-.lens-body:has(.glance-native-activity) .lens-figure { font-size: 54px; }
-.lens-body:has(.glance-native-activity) .lens-row { min-height: 62px; }
-.lens-body:has(.glance-native-activity) .lens-row-label { font-size: 24px; }
-.lens-body:has(.glance-native-activity) .lens-row-hint { font-size: 17px; }
-.lens [data-action-id].is-focused { outline: 3px solid #a9cdf5; outline-offset: -3px; }
-
-.lens [data-action-id].is-focused { background: #fff !important; color: #123b64 !important; }
-.lens [data-action-id].is-focused .lens-row-hint,
-.lens [data-action-id].is-focused .lens-row-aside { color: #2a527a !important; }
 
 /* Mode picker: a transparent outlined box over the world, neighbours tilted away.
    Black emits nothing on the display, so the box adds only its outline and glow. */
@@ -383,6 +369,57 @@
 }
 .lens-wheel .lens-wheel-label { font-size: 72px; line-height: 1; font-weight: 700; letter-spacing: -0.035em; white-space: nowrap; }
 .lens-wheel .lens-wheel-hint { font-size: 24px; font-weight: 500; letter-spacing: -0.005em; color: #b9d7fb; margin-top: 10px; }
-.lens-picker-top { position: absolute; top: 34px; left: 38px; right: 38px; display: flex; align-items: baseline; justify-content: space-between; font-size: 19px; color: rgba(255, 255, 255, 0.72); }
+.lens-picker-top { pointer-events: none; position: absolute; top: 34px; left: 38px; right: 38px; display: flex; align-items: baseline; justify-content: space-between; font-size: 19px; color: rgba(255, 255, 255, 0.72); }
 .lens-picker-mark { font-family: var(--font-garamond), "EB Garamond", Georgia, serif; font-size: 36px; line-height: 1; letter-spacing: -0.01em; color: rgba(255, 255, 255, 0.86); }
-.lens-picker-source { justify-content: center; bottom: 36px; height: 30px; font-size: 19px; color: rgba(255, 255, 255, 0.72); }
+.lens-picker-source { pointer-events: none; justify-content: center; bottom: 36px; height: 30px; font-size: 19px; color: rgba(255, 255, 255, 0.72); }
+
+/* ── Glasses style ────────────────────────────────────────────────────────────
+   The display is additive: black is clear glass and every lit pixel glares.
+   So nothing is a solid light block. Controls are outlines on black; the
+   selected one gains a white outline, a soft glow and a faint lift, the same
+   treatment as the mode picker. Accent and pay actions are tinted, not filled. */
+.lens-pill { border: 2px solid rgba(255, 255, 255, 0.32); color: rgba(255, 255, 255, 0.9); }
+.lens-pill > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Pills share the row by label length, so "Keep shopping" and "Add a card on phone" fit whole. */
+.lens-actions .lens-pill { flex: 1 1 auto; font-size: 28px; padding: 0 22px; }
+.lens-pill.is-primary { background: rgba(169, 205, 245, 0.14); border-color: rgba(169, 205, 245, 0.7); color: var(--lens-accent); }
+.lens-pill.is-pay { background: rgba(60, 108, 240, 0.24); border-color: rgba(143, 176, 255, 0.85); color: #fff; }
+.lens-pill.is-pay::before { background: #8fb0ff; }
+.lens-pill.is-quiet { border-color: rgba(255, 255, 255, 0.2); }
+
+.lens .is-focused::after,
+.lens .lens-chip.is-focused::after,
+.lens .lens-pill.is-focused::after,
+.lens .lens-key.is-focused::after {
+  inset: 0;
+  border: 3px solid #fff;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.4), inset 0 0 12px rgba(255, 255, 255, 0.08);
+}
+.lens .lens-row.is-focused::after { border-radius: 20px; }
+.lens .lens-key.is-focused::after { border-radius: 14px; }
+.lens .lens-pill.is-focused,
+.lens .lens-chip.is-focused,
+.lens .lens-row.is-focused,
+.lens .lens-key.is-focused { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.lens .lens-pill.is-primary.is-focused { background: rgba(169, 205, 245, 0.2); color: #fff; }
+.lens .lens-pill.is-pay.is-focused { background: rgba(60, 108, 240, 0.34); }
+.lens .lens-chip.is-mode.is-focused { color: #fff; }
+
+/* Status marks are outlined, never solid discs. */
+.lens-badge { border: 3px solid currentColor; background: transparent; }
+.lens-badge.is-ok { background: transparent; color: var(--lens-best); }
+.lens-badge.is-warn { background: transparent; color: var(--lens-warn); }
+.lens-badge.is-pay { background: transparent; color: #8fb0ff; }
+.lens-check.is-on { background: transparent; color: var(--lens-accent); }
+
+/* Toasts sit on black like everything else. */
+.lens-toast { background: #000; color: #fff; border: 2px solid var(--lens-accent); box-shadow: 0 0 16px rgba(169, 205, 245, 0.35); }
+
+/* Product photos arrive on white; take the edge off so they don't glare. */
+.lens-thumb { filter: brightness(0.86); }
+
+/* Titles never give way to the content under them; long lists stay inside their area. */
+.lens-body { overflow: hidden; }
+.lens-body > .lens-title, .lens-body > .lens-eyebrow, .lens-body > div > .lens-title { flex: none; }
+.lens-row { min-height: 76px; }
+.lens-rows { gap: 8px; }

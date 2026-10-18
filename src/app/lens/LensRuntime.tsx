@@ -11,7 +11,7 @@ import { fixtureState } from "@/lens/fixtures";
  * WKWebView (detected by the bridge handler), sample otherwise. Fixture query
  * parameters only work in development builds.
  */
-export function LensRuntime({ fixtureScreen, source, groceryEntry }: { fixtureScreen?: string; source?: string; groceryEntry?: boolean }) {
+export function LensRuntime({ fixtureScreen, source, groceryEntry, pairCode }: { fixtureScreen?: string; source?: string; groceryEntry?: boolean; pairCode?: string }) {
   const native = useSyncExternalStore(() => () => {}, () => !!(window as unknown as { webkit?: { messageHandlers?: { glance?: unknown } } }).webkit?.messageHandlers?.glance, () => false);
   const capture = (source === "sample" || source === "webcam" || source === "native" ? source : native ? "native" : "sample") as CaptureKind;
   if (fixtureScreen) {
@@ -23,8 +23,8 @@ export function LensRuntime({ fixtureScreen, source, groceryEntry }: { fixtureSc
     );
   }
   return (
-    <LensProvider capture={capture} initial={groceryEntry ? (s) => ({ ...s, mode: "grocery", grocery: { ...s.grocery, storeEntry: { store: "QFC", active: true } } }) : undefined}>
-      <Lens interactive instant={capture === "native"} />
+    <LensProvider capture={capture} pairCode={pairCode} initial={groceryEntry ? (s) => ({ ...s, mode: "grocery", grocery: { ...s.grocery, storeEntry: { store: "QFC", active: true } } }) : undefined}>
+      <Lens interactive instant={native} />
     </LensProvider>
   );
 }

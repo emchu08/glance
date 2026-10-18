@@ -82,12 +82,14 @@ export function Lens({ interactive = true, scale = 1, instant = false, className
   );
 }
 
-const EYEBROW_SCREENS = new Set(["grocery-item", "glimpse-cart-item", "gourmet-recipe", "wallet-order"]);
+const EYEBROW_SCREENS = new Set(["grocery-item", "glimpse-cart-item", "gourmet-recipe", "wallet-order", "grocery-checkout", "wallet"]);
 
 function ScreenHeading() {
   const { state } = useLens();
   const title = screenTitle(state);
   if (!title) return null;
+  // A filled cart leads with its total; the title would only push the list off the lens.
+  if (state.screen.id === "grocery" && state.grocery.cart.length > 0 && !state.grocery.pendingAsk) return null;
   // Screens whose body leads with the item name show the title as a short eyebrow instead.
   const eyebrow = EYEBROW_SCREENS.has(state.screen.id) || ((state.screen.id === "glimpse" && state.glimpse.candidates.length > 0 && state.glimpse.scan !== "scanning") || (state.screen.id === "gourmet" && state.gourmet.hypotheses.length > 0 && state.gourmet.scan === "result"));
   if (eyebrow) return <p className="lens-eyebrow">{title}</p>;
