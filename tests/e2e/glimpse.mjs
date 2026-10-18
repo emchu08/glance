@@ -42,7 +42,7 @@ test("fixture lens pages render in development and the relay pairs", async () =>
   const r = await fetch(`${base}/lens?screen=offers-photo&source=sample`); assert.equal(r.status, 200);
   const html = await r.text(); assert.ok(html.includes("mrbd-web-app-capable"));
   const pair = await json("/api/relay/pair", { role: "lens" }); assert.equal(pair.status, 200); assert.match(pair.data.code, /^[A-Z2-9]{6}$/);
-  const status = await json(`/api/relay/status?code=${pair.data.code}`); assert.equal(status.data.phone, false);
+  const status = await json(`/api/relay/status?code=${pair.data.code}&role=lens`); assert.equal(status.data.phone, false);
   const frame = await fetch(`${base}/api/relay/frame?code=${pair.data.code}`); assert.equal(frame.status, 204);
   const badUpload = await json("/api/relay/frame", { code: pair.data.code, token: "nope-nope-nope", image: "data:image/jpeg;base64,AAAA", width: 10, height: 10, capturedAt: Date.now() }); assert.equal(badUpload.status, 403);
 });

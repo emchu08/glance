@@ -28,7 +28,7 @@ actor RelayClient {
 
     func status() async throws -> Status {
         var components = URLComponents(url: baseURL.appending(path: "/api/relay/status"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "code", value: code)]
+        components.queryItems = [URLQueryItem(name: "code", value: code), URLQueryItem(name: "role", value: "phone")]
         var req = URLRequest(url: components.url!); req.timeoutInterval = 6; req.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, res) = try await URLSession.shared.data(for: req)
         guard (res as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }

@@ -77,7 +77,8 @@ export function cameraLine(state: LensState): string {
   switch (state.pairing.status) {
     case "connected": return "Glasses camera live";
     case "awaiting-camera": return "Starting the glasses camera…";
-    case "waiting": return "Open Glance on your phone";
+    // The code lets the wearer check it matches the end of the address shown in the phone app.
+    case "waiting": return state.pairing.code ? `Open Glance on your phone · ${state.pairing.code.slice(0, 3)} ${state.pairing.code.slice(3)}` : "Open Glance on your phone";
     case "stale": return "Camera paused · check your phone";
     case "reconnecting": return "Reconnecting…";
     case "unavailable": return "Can’t reach Glance";

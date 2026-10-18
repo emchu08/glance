@@ -8,7 +8,7 @@ import { createNativeAdapter, createSampleAdapter, createWebcamAdapter, type Cap
 import { moveFocus, moveLinear, reconcileFocus, type Direction } from "./navigation";
 import { initialState, lensReducer } from "./reducer";
 import { describeScreen, groceryQuery, isPayable } from "./screens";
-import { loadPersisted, savePersisted, PAIR_KEY } from "./storage";
+import { loadPersisted, savePersisted, PAIR_KEY, PHONE_CODE_KEY } from "./storage";
 import * as svc from "./services";
 import type { LensAction, LensEffect, LensEvent, LensState, OrderSummary } from "./types";
 
@@ -127,14 +127,17 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     }
     (async () => {
       try {
+        // The glasses web app keeps the phone's code, so a launch that loses the URL's ?pair= still finds the phone.
+        if (pairCode && !companion) localStorage.setItem(PHONE_CODE_KEY, pairCode);
+        const phoneCode = pairCode ?? (companion ? null : localStorage.getItem(PHONE_CODE_KEY));
         const stored = JSON.parse(localStorage.getItem(PAIR_KEY) ?? "null") as { code: string; at: number } | null;
-        const body = pairCode ? { code: pairCode, claim: true } : stored && Date.now() - stored.at < 5 * 60_000 ? { code: stored.code } : {};
+        const body = phoneCode ? { code: phoneCode, claim: true } : stored && Date.now() - stored.at < 5 * 60_000 ? { code: stored.code } : {};
         const res = await fetch("/api/relay/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
         const data = (await res.json()) as { code: string; token: string };
         if (cancelled) return;
         pairingCodes.set(instanceId, data.code);
         pairingTokens.set(instanceId, data.token);
-        if (!pairCode) localStorage.setItem(PAIR_KEY, JSON.stringify({ code: data.code, at: Date.now() }));
+        if (!phoneCode) localStorage.setItem(PAIR_KEY, JSON.stringify({ code: data.code, at: Date.now() }));
         if (companion) dispatch({ type: "pairing/set", status: stateRef.current.pairing.status, code: data.code });
         else dispatch({ type: "pairing/set", status: "waiting", code: data.code });
       } catch (e) {

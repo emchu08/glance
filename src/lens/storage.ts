@@ -8,6 +8,8 @@ import type { SavedOffer } from "./types";
  */
 export const STORAGE_KEY = "glance.v1";
 export const PAIR_KEY = "glance.pair.v1";
+/** The phone's long-lived code, remembered by the glasses web app from its launch URL. */
+export const PHONE_CODE_KEY = "glance.phoneCode.v1";
 export const CAMERA_KEY = "glance.camera.v1";
 
 const amount = z.object({ quantity: z.number().nullable(), unit: z.string().nullable() });

@@ -48,7 +48,14 @@ const post = async (path, body) => {
     clearInterval(ticker);
     assert.ok(recognized, 'Recognition ran on a relayed frame');
     assert.equal(recognized.image, FRAME);
+    // Relaunched without ?pair= (the code is remembered on the glasses): still the same phone.
+    await page.goto(`${base}/lens?source=native`);
+    await page.waitForSelector('[data-screen="picker"]');
+    const keepAlive = setInterval(() => { upload().catch(() => {}); }, 1000);
+    try {
+      await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera live'), null, { timeout: 15000 });
+    } finally { clearInterval(keepAlive); }
     assert.deepEqual(errors, []);
-    console.log(`PASS: glasses web app claimed ${code}, phone joined and uploaded, presence both ways, scan used the relayed frame, no browser errors.`);
+    console.log(`PASS: glasses web app claimed ${code}, phone joined and uploaded, presence both ways, scan used the relayed frame, relaunch without the code still pairs, no browser errors.`);
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

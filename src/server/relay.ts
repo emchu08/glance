@@ -226,12 +226,18 @@ export async function getFrame(code: string): Promise<FrameRecord | null> {
   return relayBackend().get<FrameRecord>(kFrame(code));
 }
 
-/** Presence for both ends. `asLens` marks the lens as present, since the lens is what polls. */
-export async function pairingStatus(code: string, asLens = false): Promise<{ phone: boolean; lens: boolean; frameAgeMs: number | null; demand: boolean; backend: string } | null> {
+/**
+ * Presence for both ends. Each side's own status checks mark it present (the lens sends
+ * role=lens; the phone app polls every 2 s), so an open phone counts even before its camera
+ * has sent a frame.
+ */
+export async function pairingStatus(code: string, role: "lens" | "phone" | null = null): Promise<{ phone: boolean; lens: boolean; frameAgeMs: number | null; demand: boolean; backend: string } | null> {
   const b = relayBackend();
   const p = await b.get<PairRecord>(kPair(code));
   if (!p) return null;
-  if (asLens) { p.lensSeenAt = Date.now(); await b.set(kPair(code), p, RELAY.pairTtlMs); }
+  if (role === "lens") p.lensSeenAt = Date.now();
+  if (role === "phone") p.phoneSeenAt = Date.now();
+  if (role) await b.set(kPair(code), p, RELAY.pairTtlMs);
   const f = await b.get<FrameRecord>(kFrame(code));
   const now = Date.now();
   return { phone: !!p.phoneSeenAt && now - p.phoneSeenAt < RELAY.presenceTtlMs, lens: !!p.lensSeenAt && now - p.lensSeenAt < RELAY.presenceTtlMs, frameAgeMs: f ? now - f.uploadedAt : null, demand: p.demandUntil > now, backend: b.name };
