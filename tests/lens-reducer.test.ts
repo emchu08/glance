@@ -136,6 +136,44 @@ test("holding an added item up for a long time never asks to add it again", () =
   assert.equal(units(c, "arrowhead-spring-water"), 1);
 });
 
+test("Back (or Not it) on a wrong pick returns to the cart and rescans; the wrong item never adds itself", () => {
+  let s = frame(liveGrocery(), water("held"));
+  assert.equal(s.screen.id, "grocery-item");
+  const back = describeScreen(s).find((a) => a.id === "hdr-back")!;
+  assert.deepEqual(back.events, [{ type: "grocery/dismiss-held" }], "the back gesture means not it");
+  assert.ok(describeScreen(s).some((a) => a.id === "not-it"));
+  for (const e of back.events) s = lensReducer(s, e);
+  assert.equal(s.screen.id, "grocery", "back to the cart");
+  // Still in hand: the same wrong pick doesn't pop straight back, and dropping it in the cart doesn't add it.
+  s = frame(s, water("held"));
+  assert.equal(s.screen.id, "grocery");
+  s = frame(s, water("in_cart"));
+  assert.equal(units(s, "arrowhead-spring-water"), 0);
+  // A different identification of what's in hand opens its own card at once.
+  s = lensReducer(s, { type: "grocery/frame", observations: [{ productKey: "smartwater", label: "Smartwater", state: "held", confidence: 0.95, packageSize: null, priceCents: null }], frameIndex: 9 });
+  assert.equal(s.screen.id, "grocery-item");
+  assert.equal(s.screen.params?.productKey, "smartwater");
+});
+
+test("with the glasses camera off, scan buttons say so instead of scanning", () => {
+  let g = lensReducer(lensReducer(boot(), { type: "capture/set", capture: "native" }), { type: "mode/set", mode: "glimpse" });
+  g = lensReducer(g, { type: "pairing/set", status: "camera-off" });
+  const scan = describeScreen(g).find((a) => a.id === "scan")!;
+  assert.equal(scan.effect, undefined, "no scan starts");
+  assert.equal(scan.events[0]?.type, "toast");
+  g = lensReducer(g, scan.events[0]);
+  assert.match(g.toast?.text ?? "", /camera isn’t on/i);
+  // Ready (or turning on for a scan): scanning works.
+  for (const status of ["connected", "camera-starting"] as const) {
+    const on = lensReducer(g, { type: "pairing/set", status });
+    assert.equal(describeScreen(on).find((a) => a.id === "scan")?.effect?.kind, "glimpse-scan", status);
+  }
+  let gr = lensReducer(lensReducer(liveGrocery(), { type: "pairing/set", status: "camera-off" }), { type: "nav/root" });
+  const start = describeScreen(gr).find((a) => a.id === "scan")!;
+  for (const e of start.events) gr = lensReducer(gr, e);
+  assert.equal(gr.grocery.scanning, false, "Grocery doesn't start scanning without a camera");
+});
+
 test("Add to cart from online listings: Grocery's cart in Grocery, the shopping cart elsewhere", () => {
   const offer = { id: "https://shop.example/oat", name: "Oat milk 64 oz", retailer: "Shop", url: "https://shop.example/oat", imageUrl: null, priceCents: 449, match: "exact" as const, kind: "external_link" as const, origin: "live" as const };
   let s = groceryAt();

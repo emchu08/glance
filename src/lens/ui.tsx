@@ -222,7 +222,7 @@ export function TopBar() {
   const { actions, state } = useLens();
   if (!actions.some((a) => a.id === "hdr-modes")) return null;
   const sample = state.capture === "sample";
-  const live = state.capture === "webcam" || state.pairing.status === "connected";
+  const live = state.capture === "webcam" || state.pairing.status === "connected" || state.pairing.status === "camera-starting";
   const count = state.glimpse.saved.length;
   const has = (id: string) => actions.some((a) => a.id === id);
   const walletReady = state.wallet.status === "ready";

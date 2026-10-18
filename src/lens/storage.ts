@@ -3,7 +3,8 @@ import type { Recipe, ShoppingListItem } from "@/data/types";
 import type { SavedOffer } from "./types";
 
 /**
- * Only saved offers, saved recipes, and the shared shopping list persist (`glance.v1`).
+ * Only saved offers and saved recipes come back after a reload (`glance.v1`). The shopping list is
+ * still written here but starts empty on every load.
  * The exploratory physical cart, raw frames, and payment flags never persist here.
  */
 export const STORAGE_KEY = "glance.v1";

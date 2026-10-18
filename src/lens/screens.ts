@@ -186,6 +186,18 @@ export function compareOffers(state: LensState, productKey: string) {
 }
 
 /** Live online prices for a grocery item (from the listing search), cheapest priced first. */
+/** No camera to scan with: the iPhone app's glasses camera is off, or no phone is sending pictures. */
+export function cameraOff(state: LensState): boolean {
+  return state.capture === "native" && ["none", "waiting", "camera-off", "reconnecting", "unavailable"].includes(state.pairing.status);
+}
+
+/** A scan control: with no camera it says so instead of starting a scan that can't get a picture. */
+function scanAct(state: LensState, id: string, label: string, row: number, x: number, events: LensAction["events"], opts: Partial<LensAction> = {}): LensAction {
+  if (!cameraOff(state)) return act(id, label, row, x, events, opts);
+  const text = state.pairing.status === "camera-off" ? "Camera isn’t on yet · connect your glasses on your phone" : "No camera yet · open Glance on your phone";
+  return act(id, label, row, x, [{ type: "toast", text }], { ...opts, effect: undefined });
+}
+
 export function describeScreen(state: LensState): LensAction[] {
   if (state.composer) return describeComposer(state);
   const s = state.screen;
@@ -200,7 +212,7 @@ export function describeScreen(state: LensState): LensAction[] {
       const g = state.glimpse;
       if (g.scan === "scanning") return [...h, act("scan-cancel", "Cancel", 0, 0.5, [{ type: "glimpse/scan-cancel" }])];
       const top = g.scan === "result" ? g.candidates.find((c) => c.id === g.chosenId) ?? g.candidates[0] : undefined;
-      const scan = act("scan", g.scan === "idle" && !g.candidates.length ? "Scan item" : "Scan again", top ? -1 : 0, 0.5, [], { variant: top ? "secondary" : "primary", effect: { kind: "glimpse-scan" } });
+      const scan = scanAct(state, "scan", g.scan === "idle" && !g.candidates.length ? "Scan item" : "Scan again", top ? -1 : 0, 0.5, [], { variant: top ? "secondary" : "primary", effect: { kind: "glimpse-scan" } });
       if (!top) return [...h, scan];
       return [...h,
         act("see-offers", "See offers", 0, 0.36, [{ type: "glimpse/offers-loading", query: top.label }, { type: "nav/push", screen: { id: "glimpse-offers" } }], { variant: "primary", effect: { kind: "glimpse-offers", candidateId: top.id } }),
@@ -216,7 +228,7 @@ export function describeScreen(state: LensState): LensAction[] {
           ...act(`cand-${c.id}`, c.label, i, 0.5, [{ type: "glimpse/choose", candidateId: c.id }, { type: "nav/back" }, ...(fromOffers ? [] : [{ type: "nav/push" as const, screen: { id: "glimpse-offers" as const } }]), { type: "glimpse/offers-loading", query: c.label }], { variant: "row", effect: { kind: "glimpse-offers", candidateId: c.id } }),
           listIndex: i,
         })),
-        { ...act("keep-looking", "Scan again", list.length, 0.5, [{ type: "nav/back" }], { variant: "row", effect: { kind: "glimpse-scan" } }), listIndex: list.length },
+        { ...scanAct(state, "keep-looking", "Scan again", list.length, 0.5, [{ type: "nav/back" }], { variant: "row", effect: { kind: "glimpse-scan" } }), listIndex: list.length },
       ];
     }
     case "glimpse-offers": {
@@ -285,7 +297,7 @@ export function describeScreen(state: LensState): LensAction[] {
       out.push(act("add", "Add", row, checkout ? 0.45 : 0.7, [{ type: "nav/push", screen: { id: "grocery-manual" } }]));
       if (checkout) out.push(act("finish", "Check out", row, 0.78, [{ type: "grocery/finish" }], { variant: "primary", effect: { kind: "grocery-exit" } }));
       if (gr.undo.length) out.push(act("undo", "Undo", -1, 0.85, [{ type: "grocery/undo" }]));
-      out.push(act("scan", gr.scanning ? "Pause scan" : "Start scan", -1.5, 0.82, [{ type: "grocery/scan-toggle", on: !gr.scanning }]));
+      out.push(gr.scanning ? act("scan", "Pause scan", -1.5, 0.82, [{ type: "grocery/scan-toggle", on: false }]) : scanAct(state, "scan", "Start scan", -1.5, 0.82, [{ type: "grocery/scan-toggle", on: true }]));
       return out;
     }
     case "grocery-item": {
@@ -295,8 +307,12 @@ export function describeScreen(state: LensState): LensAction[] {
       const online = state.capture === "sample" && best && (best.store === "Amazon" || best.store === "Temu") && (ins?.homePriceCents ?? Infinity) > best.priceCents;
       const name = CATALOG_BY_ID[key]?.name ?? state.grocery.heldLabel ?? key;
       const hasCompare = state.capture !== "sample" || compareOffers(state, key).length > 0;
-      return [...h,
+      // The camera's pick: Back (or Not it) means it named the wrong item, so look again.
+      const fromCamera = state.grocery.heldKey === key;
+      const notIt: LensAction["events"] = [{ type: "grocery/dismiss-held" }];
+      return [...(fromCamera ? h.map((a) => (a.id === "hdr-back" ? { ...a, events: notIt } : a)) : h),
         act("add", "Add", 0, 0.3, [{ type: "grocery/add-held" }], { variant: "primary", effect: { kind: "persist" } }),
+        ...(fromCamera ? [act("not-it", "Not it", 0, 0.92, notIt)] : []),
         ...(online && best
           ? [act("buy-amazon", `Buy on ${best.store}`, 0, 0.72, [{ type: "grocery/bought", retailer: best.store, name, priceCents: best.priceCents, url: onlineSearchUrl(best.store, `${name} ${best.size}`) }])]
           : hasCompare
@@ -374,10 +390,10 @@ export function describeScreen(state: LensState): LensAction[] {
       if (g.scan === "result" && g.hypotheses.length) {
         return [...h,
           ...g.hypotheses.map((hy, i) => ({ ...act(`dish-${i}`, hy.name, i, 0.5, [{ type: "gourmet/choose", dish: hy.name }], { variant: "row", effect: { kind: "gourmet-recipes", dish: hy.name } }), listIndex: i })),
-          { ...act("rescan", "Rescan", g.hypotheses.length, 0.5, [], { variant: "row", effect: { kind: "gourmet-scan" } }), listIndex: g.hypotheses.length },
+          { ...scanAct(state, "rescan", "Rescan", g.hypotheses.length, 0.5, [], { variant: "row", effect: { kind: "gourmet-scan" } }), listIndex: g.hypotheses.length },
         ];
       }
-      return [...h, act("scan", g.scan === "no-food" || g.scan === "error" ? "Scan again" : "Scan dish", 0, 0.5, [], { variant: "primary", effect: { kind: "gourmet-scan" } })];
+      return [...h, scanAct(state, "scan", g.scan === "no-food" || g.scan === "error" ? "Scan again" : "Scan dish", 0, 0.5, [], { variant: "primary", effect: { kind: "gourmet-scan" } })];
     }
     case "gourmet-recipes": {
       const g = state.gourmet;

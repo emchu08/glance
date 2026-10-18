@@ -63,7 +63,7 @@ export interface LensProviderProps {
   onLog?: (line: string) => void;
 }
 
-interface CompanionCamera { ready: boolean; message?: string }
+interface CompanionCamera { ready: boolean; starting?: boolean; message?: string }
 /** Present when the iPhone companion injected its bridge (before any page script ran). */
 const companionBridge = () => (typeof window === "undefined" ? null : (window as unknown as { glanceCompanion?: { cameraState?: CompanionCamera } }).glanceCompanion ?? null);
 
@@ -119,7 +119,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     let cancelled = false;
     // Inside the companion, frames arrive locally, so the status shown is the glasses camera's, not the relay's.
     const companion = companionBridge();
-    const showCamera = (c: CompanionCamera | undefined) => dispatch({ type: "pairing/set", status: c?.ready ? "connected" : "awaiting-camera" });
+    const showCamera = (c: CompanionCamera | undefined) => dispatch({ type: "pairing/set", status: !c?.ready ? "camera-off" : c.starting ? "camera-starting" : "connected" });
     const onCamera = (e: Event) => showCamera((e as CustomEvent<CompanionCamera>).detail);
     if (companion) {
       showCamera(companion.cameraState);
@@ -182,7 +182,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     if (fixture || hydrated.current) return;
     hydrated.current = true;
     const p = loadPersisted();
-    if (p) rawDispatch({ type: "hydrate", saved: p.saved, recipes: p.recipes, list: p.list });
+    // The shopping list starts empty on every load; saved items and recipes carry over.
+    if (p) rawDispatch({ type: "hydrate", saved: p.saved, recipes: p.recipes, list: [] });
   }, [fixture]);
   const effectiveState = state;
 

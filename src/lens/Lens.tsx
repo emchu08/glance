@@ -33,17 +33,23 @@ export function Lens({ interactive = true, scale = 1, instant = false, className
         role="application"
         aria-label={`Glance ${MODE_META[state.mode].label}`}
       >
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div
-            key={screenKey(state)}
-            className="absolute inset-0"
-            initial={still ? false : { opacity: 0, filter: "blur(6px)", scale: 0.985 }}
-            animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: still ? { duration: 0 } : { type: "spring", bounce: 0, duration: 0.34 } }}
-            exit={still ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, filter: "blur(4px)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
-          >
-            <Screen />
-          </motion.div>
-        </AnimatePresence>
+        {still ? (
+          // No motion: swap screens outright. A zero-length exit can stall (in a hidden web view, or
+          // headless), leaving old screens stacked over the new one.
+          <div key={screenKey(state)} className="absolute inset-0"><Screen /></div>
+        ) : (
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={screenKey(state)}
+              className="absolute inset-0"
+              initial={{ opacity: 0, filter: "blur(6px)", scale: 0.985 }}
+              animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { type: "spring", bounce: 0, duration: 0.34 } }}
+              exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
+            >
+              <Screen />
+            </motion.div>
+          </AnimatePresence>
+        )}
         <Toast />
         <TopBar />
       </div>

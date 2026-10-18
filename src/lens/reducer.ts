@@ -2,7 +2,7 @@ import type { CartLine, Mode, Offer, PriceSource, ShoppingListItem } from "@/dat
 import { addToCart, cartTotals, removeLine, setManualPrice, setQuantity } from "@/domain/grocery/cart";
 import { buildTripSummary } from "@/domain/grocery/exit";
 import { completeListFromCart } from "@/domain/grocery/list";
-import { claimHold, currentlyHeld, stepTracker } from "@/domain/grocery/tracker";
+import { claimHold, currentlyHeld, dismissHold, stepTracker } from "@/domain/grocery/tracker";
 import { CATALOG_BY_ID } from "@/data/grocery";
 import { additionSignature, addIngredientsToList, scaleIngredients } from "@/domain/gourmet/list";
 import { groceryCardPrice } from "./groceryPrice";
@@ -292,6 +292,14 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       if (state.grocery.cart.some((l) => l.productKey === productKey)) return state;
       const cart = addToCart(state.grocery.cart, { productKey, label: event.offer.name, packageSize: null, unitPriceCents: event.offer.priceCents, priceSource: "online", eventId: `${productKey}#${Date.now()}` });
       return bump({ ...cooled(state), grocery: { ...state.grocery, undo: [state.grocery.cart, ...state.grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: productKey }, toast: { text: "Added to cart", at: Date.now() } });
+    }
+    case "grocery/dismiss-held": {
+      // Wrong item: back to the cart and look again; this identification can't add itself meanwhile.
+      const key = state.screen.id === "grocery-item" ? String(state.screen.params?.productKey ?? "") : state.grocery.heldKey ?? "";
+      const tracker = key ? dismissHold(state.grocery.tracker, key) : state.grocery.tracker;
+      const pendingAsk = state.grocery.pendingAsk?.productKey === key ? null : state.grocery.pendingAsk;
+      const grocery = { ...state.grocery, tracker, pendingAsk, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null, acknowledgement: state.grocery.scanning ? "Rescanning…" : null };
+      return root({ ...cooled(state), grocery }, "grocery");
     }
     case "grocery/add-manual": {
       const eventId = `${event.productKey}#manual-${Date.now()}`;

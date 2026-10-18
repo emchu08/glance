@@ -42,7 +42,8 @@ export interface LensAction {
 export type ScanStatus = "idle" | "scanning" | "result" | "error" | "no-food";
 export type AsyncStatus = "idle" | "loading" | "ready" | "error" | "empty";
 export type HandoffStatus = "idle" | "sending" | "queued" | "sent" | "failed";
-export type PairingStatus = "none" | "waiting" | "connected" | "awaiting-camera" | "reconnecting" | "stale" | "denied" | "unavailable";
+/** `camera-off` / `camera-starting`: the iPhone app's glasses camera (off and not ready, or turning on for a scan). */
+export type PairingStatus = "none" | "waiting" | "connected" | "camera-starting" | "camera-off" | "awaiting-camera" | "reconnecting" | "stale" | "denied" | "unavailable";
 export type WalletStatus = "unknown" | "signed-out" | "not-ready" | "ready";
 export type AutoBuyStatus = "off" | "on" | "paused";
 export type PaymentStatus =
@@ -222,6 +223,7 @@ export type LensEvent =
   | { type: "grocery/scan-toggle"; on?: boolean }
   | { type: "grocery/frame"; observations: import("@/data/types").GroceryObservation[]; frameIndex: number }
   | { type: "grocery/add-held" }
+  | { type: "grocery/dismiss-held" }
   | { type: "grocery/add-manual"; productKey: string; label: string; packageSize: string | null; unitPriceCents: number | null; source: import("@/data/types").PriceSource }
   | { type: "grocery/add-offer"; offer: Offer }
   | { type: "grocery/confirm-ask"; yes: boolean }

@@ -40,14 +40,22 @@ const fs = require('node:fs');
     // The companion opens straight on the picker (no intro), with the glasses camera's status, never a pair code.
     await page.waitForSelector('[data-screen="picker"]');
     assert.equal(await page.locator('[data-action-id="skip"]').count(), 0, 'No intro or Skip');
-    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Starting the glasses camera'));
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera isn’t ready'));
     assert.ok(!/pair code/i.test(await lensText()), 'No relay pair code inside the companion');
+    // Camera not on yet: Scan says so instead of scanning.
+    await page.locator('[data-action-id="mode-glimpse"]').click();
+    await page.locator('[data-action-id="scan"]').click();
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Camera isn’t on yet'));
+    assert.ok(!(await page.evaluate(() => window.nativeMessages.some(m => m.type === 'frame'))), 'No frame requested with the camera off');
+    await page.evaluate(() => window.glanceBridge.back());
+    await page.waitForSelector('[data-screen="picker"]');
     await page.evaluate(() => { window.frameAvailable = true; window.glanceCompanion.camera({ ready: true }); });
     await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera ready'));
 
     // Grocery says each thing once; the companion adds nothing to the page.
     await page.locator('[data-action-id="mode-grocery"]').click();
     await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Start scan, then hold an item up.'));
+    assert.equal(await page.locator('.lens > .absolute.inset-0').count(), 1, 'One screen at a time (no stale copies stacked on the glasses)');
     assert.equal(await page.locator('.glance-native-activity').count(), 0, 'No injected banner');
     await page.locator('[data-action-id="scan"]').click();
     await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Scanning for items'));
@@ -62,9 +70,9 @@ const fs = require('node:fs');
 
     // Camera drops: the one instruction line says why, instead of a second message.
     await page.evaluate(() => window.glanceCompanion.camera({ ready: false }));
-    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Starting the glasses camera'));
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera isn’t ready'));
     text = await lensText();
-    assert.equal(count(text, 'Starting the glasses camera'), 1);
+    assert.equal(count(text, 'Glasses camera isn’t ready'), 1);
     assert.equal(count(text, 'Hold an item up'), 0);
     await page.evaluate(() => window.glanceCompanion.camera({ ready: true }));
 

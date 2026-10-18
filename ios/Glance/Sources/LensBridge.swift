@@ -34,6 +34,8 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
     var onCameraDemand: (() -> Void)?
     /// The camera is ready to turn on for a scan, though not streaming now.
     private var cameraStandby = false
+    /// A scan is waiting for the camera to turn on (the lens says so until the first picture).
+    private var cameraStarting = false
 
     func makeWebView(url: URL) -> WKWebView {
         if let webView { return webView }
@@ -95,6 +97,10 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
         switch body["type"] as? String {
         case "frame":
             onCameraDemand?()
+            if cameraFrame.map({ Date().timeIntervalSince($0.at) > 2 }) ?? true, cameraStandby, !cameraStarting {
+                cameraStarting = true
+                updateCameraStatus(force: true)
+            }
             Task { @MainActor in
                 // The camera may be just turning on: wait for a fresh frame, never return an old one.
                 let deadline = ContinuousClock.now.advanced(by: .seconds(12))
@@ -102,7 +108,8 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
                     try? await Task.sleep(for: .milliseconds(50))
                 }
                 guard let frame = cameraFrame, Date().timeIntervalSince(frame.at) <= 2 else {
-                    replyHandler(nil, "Camera not ready. Connect your glasses on the phone."); return
+                    if cameraStarting { cameraStarting = false; updateCameraStatus(force: true) }
+                    replyHandler(nil, cameraStandby ? "The glasses camera didn’t turn on. Try again, or tap Reconnect on your phone." : "The glasses camera is off. Connect your glasses in the Glance app on your phone."); return
                 }
                 replyHandler(["image": "data:image/jpeg;base64,\(frame.jpeg.base64EncodedString())", "width": frame.width, "height": frame.height, "capturedAt": Int(frame.at.timeIntervalSince1970 * 1000)], nil)
             }
@@ -116,17 +123,20 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
         let now = Date()
         cameraFrame = (jpeg, width, height, now)
         lastFrameAt = now
-        if cameraReady != true { updateCameraStatus() }
+        if cameraStarting { cameraStarting = false; updateCameraStatus(force: true) }
+        else if cameraReady != true { updateCameraStatus() }
     }
 
-    func clearCamera() { cameraFrame = nil; lastFrameAt = nil; cameraStandby = false; updateCameraStatus(force: true) }
+    func clearCamera() { cameraFrame = nil; lastFrameAt = nil; cameraStandby = false; cameraStarting = false; updateCameraStatus(force: true) }
     func setCameraStandby(_ on: Bool) { cameraStandby = on; updateCameraStatus(force: true) }
     /// Ready means a scan can get a picture: streaming now, or on standby to turn on.
     func updateCameraStatus(force: Bool = false) {
         let ready = cameraStandby || (lastFrameAt.map { Date().timeIntervalSince($0) < 2 } ?? false)
         guard force || ready != cameraReady else { return }
         cameraReady = ready
-        js("window.glanceCompanion?.camera({ready: \(ready), message: \(jsonString(ready ? "Camera ready" : "Connect your glasses on the phone."))})")
+        let starting = ready && cameraStarting
+        let message = starting ? "Turning on the glasses camera…" : ready ? "Camera ready" : "Connect your glasses on the phone."
+        js("window.glanceCompanion?.camera({ready: \(ready), starting: \(starting), message: \(jsonString(message))})")
     }
 
     func walletReturned() { js("window.glanceCompanion?.walletReturned()") }

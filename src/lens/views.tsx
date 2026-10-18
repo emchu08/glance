@@ -78,6 +78,8 @@ export function cameraLine(state: LensState): string {
   switch (state.pairing.status) {
     // Ready to scan: in the phone app the camera turns on only while a scan wants pictures.
     case "connected": return "Glasses camera ready";
+    case "camera-starting": return "Turning on the glasses camera…";
+    case "camera-off": return "Glasses camera isn’t ready · check your phone";
     case "awaiting-camera": return "Starting the glasses camera…";
     // The code lets the wearer check it matches the end of the address shown in the phone app.
     case "waiting": return state.pairing.code ? `Open Glance on your phone · ${state.pairing.code.slice(0, 3)} ${state.pairing.code.slice(3)}` : "Open Glance on your phone";
@@ -88,7 +90,9 @@ export function cameraLine(state: LensState): string {
   }
 }
 
-const cameraDown = (state: LensState) => state.capture === "native" && state.pairing.status !== "connected";
+const cameraDown = (state: LensState) => state.capture === "native" && state.pairing.status !== "connected" && state.pairing.status !== "camera-starting";
+/** A scan is waiting for the glasses camera to turn on. */
+const cameraStarting = (state: LensState) => state.capture === "native" && state.pairing.status === "camera-starting";
 
 /** A camera problem in one quiet line, on screens that need the camera. */
 function CameraNote({ className }: { className?: string }) {
@@ -128,7 +132,7 @@ function ModeWheel() {
   const modes = actions.filter((a) => a.id.startsWith("mode-"));
   const selected = Math.max(0, modes.findIndex((a) => a.id === focusId));
   const reduced = state.reducedMotion;
-  const live = state.capture === "webcam" || state.pairing.status === "connected";
+  const live = state.capture === "webcam" || state.pairing.status === "connected" || state.pairing.status === "camera-starting";
   return (
     <div className="absolute inset-0" aria-label="Choose a mode">
       <div className="absolute top-9 left-11 opacity-80"><Wordmark size={40} /></div>
@@ -202,7 +206,7 @@ function GlimpseScan() {
         <Center>
           {scanning ? <Spinner purpose="scan" /> : failed ? <AlertCircle className="size-[76px]" style={{ color: AMBER }} strokeWidth={1.7} aria-hidden /> : <ScanLine className="size-[76px]" style={{ color: BLUE }} strokeWidth={1.6} aria-hidden />}
           <p className={clsx("mt-7 text-[42px]", HEADLINE)} role="status">
-            {scanning ? "Scanning item…" : failed ? "Couldn’t scan" : nothing ? "No item found" : "Point at an item"}
+            {scanning ? (cameraStarting(state) ? "Turning on the camera…" : "Scanning item…") : failed ? "Couldn’t scan" : nothing ? "No item found" : "Point at an item"}
           </p>
           <p className="mt-3 line-clamp-2 text-[25px] text-white/60">
             {scanning ? "Hold still while Glance identifies it" : failed ? g.error ?? "Try again" : nothing ? "Move closer and try scanning again" : "Choose Scan item when it’s in view"}
@@ -569,7 +573,7 @@ function GroceryCart() {
       <div className="absolute top-[66px] right-11 left-11 flex h-[44px] items-center justify-between gap-3">
         <p className="flex min-w-0 items-center gap-2 text-[22px] text-white/70" role="status">
           {gr.scanning && <Spinner small purpose="scan" />}
-          <span className="truncate">{cameraDown(state) ? cameraLine(state) : gr.scanning ? "Scanning for items…" : "Scanning paused"}</span>
+          <span className="truncate">{cameraDown(state) || (gr.scanning && cameraStarting(state)) ? cameraLine(state) : gr.scanning ? "Scanning for items…" : "Scanning paused"}</span>
         </p>
         <Act id="scan" className="flex h-[44px] shrink-0 items-center rounded-full px-4 text-[21px] font-semibold ring-2 ring-white/30" />
       </div>
@@ -702,6 +706,7 @@ function GroceryItem() {
         <Pill id="add" className="h-[76px] flex-1" icon={<Plus className="size-[28px]" aria-hidden />} />
         <Pill id="buy-amazon" className="h-[76px] flex-[1.4] text-[27px]" />
         <Pill id="compare" className="h-[76px] flex-1" />
+        <Pill id="not-it" className="h-[76px] flex-1" />
       </BottomRow>
     </>
   );
@@ -1097,7 +1102,7 @@ function GourmetHome() {
       <>
         <Center>
           <Spinner purpose="scan" />
-          <p className={clsx("mt-7 text-[40px]", HEADLINE)} role="status">Scanning dish…</p>
+          <p className={clsx("mt-7 text-[40px]", HEADLINE)} role="status">{cameraStarting(state) ? "Turning on the camera…" : "Scanning dish…"}</p>
           <p className="mt-3 text-[25px] text-white/60">Hold still while Glance identifies it</p>
         </Center>
         <BottomRow><Pill id="scan-cancel" className="w-[260px]" /></BottomRow>
