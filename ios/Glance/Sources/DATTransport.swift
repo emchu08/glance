@@ -107,8 +107,10 @@ final class DATTransport: GlassesTransport {
             try await Task.sleep(for: .milliseconds(150))
         }
         guard let device = selectedDevice else {
-            onState?(.noDevice)
-            throw TransportError.message("No compatible Display glasses connected. Open Meta AI, check firmware, and put on your glasses.")
+            let seen = Wearables.shared.devices.compactMap { Wearables.shared.deviceForIdentifier($0) }
+            let update = seen.contains { $0.supportsDisplay() && [.deviceUpdateRequired, .sdkUpdateRequired].contains($0.compatibility()) }
+            onState?(update ? .outdatedSDK : .noDevice)
+            throw TransportError.message(Self.whyNoGlasses(seen))
         }
         let newSession = try Wearables.shared.createSession(deviceSelector: SpecificDeviceSelector(device: device.identifier))
         session = newSession
@@ -154,6 +156,30 @@ final class DATTransport: GlassesTransport {
             disconnect()
             throw error
         }
+    }
+
+    /// Says what Meta AI reported for each pair of glasses, so a failed connect names its cause.
+    private static func whyNoGlasses(_ seen: [Device]) -> String {
+        guard !seen.isEmpty else {
+            return "Meta AI isn’t sharing any glasses with Glance. Open Meta AI, make sure your glasses show as connected there, then tap Reconnect."
+        }
+        let rows = seen.map { d in
+            "\(d.nameOrId()) (\(d.deviceType().rawValue)): link \(d.linkState), \(d.compatibility().displayString), worn \(d.donState), hinge \(d.hingeState)"
+        }.joined(separator: "; ")
+        let display = seen.filter { $0.supportsDisplay() }
+        let advice: String
+        if display.isEmpty {
+            advice = "None of these are Display glasses."
+        } else if display.contains(where: { $0.compatibility() == .deviceUpdateRequired }) {
+            advice = "Your glasses need a firmware update in Meta AI."
+        } else if display.contains(where: { $0.compatibility() == .sdkUpdateRequired }) {
+            advice = "Meta AI says this Glance build is too old for your glasses."
+        } else if display.allSatisfy({ $0.linkState != .connected }) {
+            advice = "Your glasses aren’t connected to this iPhone right now. Open Meta AI until it shows them connected (Bluetooth on, glasses unfolded and on), then tap Reconnect."
+        } else {
+            advice = "Open Meta AI, check firmware, and put on your glasses."
+        }
+        return "No compatible Display glasses connected. \(advice) Seen: \(rows)"
     }
 
     func startDisplay() async throws {
