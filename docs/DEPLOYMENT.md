@@ -5,7 +5,6 @@
 | Surface | URL | Notes |
 | --- | --- | --- |
 | Root app (marketing, presenter, glasses, lens, wallet, APIs) | https://glance-blue.vercel.app | Vercel project `glance`, production; public (no deployment protection on production) |
-| Standalone 3D site | https://glance-website-lac.vercel.app | Vercel project `glance-website` (Vite static build) |
 | Stripe webhook | `we_1URfeG0lU2xH9eJlWHtbDXrh` → `/api/payments/webhook` | sandbox; signature verified against the raw body; `STRIPE_WEBHOOK_SECRET` set on Vercel |
 | Supabase | project `qpneiyefrsnlvmeumphi` (us) | migration `glance_init` applied |
 
@@ -36,8 +35,6 @@ npx vercel --prod
 Supabase: `supabase/migrations/0001_init.sql` is applied to the project (via the Supabase MCP). `npm run db:migrate`
 applies it elsewhere with `SUPABASE_DB_URL`. Seed: `npm run seed:sandbox`.
 
-Standalone 3D site: `cd website && npm run build` → deploy `website/dist` as a static site (Vercel: root `website`,
-framework Vite). Set `VITE_LIVE_APP_URL` to the root app origin for the "Try live demo" link.
 
 Relay backend: process memory in development; set `UPSTASH_REDIS_REST_URL/TOKEN` (or `KV_REST_API_*`) for atomic
 multi-instance delivery in production. The Runtime Cache fallback is regional and non-atomic; do not rely on it for

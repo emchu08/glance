@@ -13,7 +13,6 @@
 | Marketing page, presenter, wearer preview, connect | `app/page.tsx`, `app/demo`, `app/glasses`, `app/connect` | Done |
 | Merchant / privacy / terms / receipts / recovery | `app/merchant`, `app/privacy`, `app/terms`, `app/orders/[id]`, `app/payments/recover/[id]` | Done |
 | Manifest + icons | `app/manifest.webmanifest`, `app/icons/[file]` | Done |
-| 3D site | `website/` | Built; smoke test needs Chrome |
 | iOS companion | `ios/` | Scaffolded; DAT package + device verification pending |
 | MediaPipe runtime copy, EfficientDet model | `scripts/copy-mediapipe-wasm.mjs`, `public/models/` | Runtime copied; model download documented (not vendored) |
 | Tests/tooling | `tests/*.test.ts`, `tests/e2e/*`, `scripts/*` | 27 unit, 10 e2e |

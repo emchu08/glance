@@ -38,7 +38,6 @@ conditional on documented access and is not implemented. User-set purchase limit
 ## Public URLs
 
 - Root app: https://glance-blue.vercel.app
-- 3D site: https://glance-website-lac.vercel.app
 - Repository: https://github.com/emchu08/glance
 
 ## 90–120 second demo script (onboarding already completed)

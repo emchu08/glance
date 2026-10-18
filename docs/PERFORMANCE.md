@@ -15,7 +15,7 @@ explicit AI scans (never per frame); Grocery sampling every 3 s; relay frames â‰
 ## Measure
 
 ```bash
-npm run measure:performance          # uses website/node_modules/playwright; writes measurements/performance.local.json
+npm run measure:performance          # needs Playwright (npm i -D playwright && npx playwright install chromium); writes measurements/performance.local.json
 MEASURE_DEVICE="MacBook Pro 14 M3, macOS 15, Chrome 141, 120Hz" npm run measure:performance
 ```
 

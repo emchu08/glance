@@ -1,10 +1,8 @@
 # dependencies
 node_modules
-website/node_modules
 # builds
 .next
 out
-website/dist
 *.tsbuildinfo
 next-env.d.ts
 # generated runtime assets (reproduced by `npm install` / model setup)
@@ -14,7 +12,6 @@ public/models/*.tflite
 .env
 .env.local
 .env.*.local
-website/.env.local
 # native
 ios/DerivedData
 ios/*.xcodeproj/xcuserdata

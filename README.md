@@ -46,7 +46,6 @@ BASE_URL=http://localhost:3100 node --test tests/e2e/native-display.mjs tests/e2
 npm run test:vision && npm run test:grocery   # offline sample paths; GLANCE_LIVE=1 <image> calls the model (paid)
 ```
 
-Standalone 3D site: `cd website && npm ci && npm run dev` → `npm run test:smoke` (and `FULL_WALKTHROUGH=1`).
 
 ## Architecture
 
@@ -57,7 +56,6 @@ src/domain         Pure logic: grocery tracker/cart/insights/exit/list, gourmet 
 src/data           Deterministic fixtures from the spec appendices (Glimpse, Grocery, Gourmet, demo merchant)
 src/server         Supabase/Stripe/Claude clients, commerce (quotes→orders→purchase→webhooks→ledger), relay, ads, URL hardening
 supabase/          Migrations + RLS
-website/           Independent Vite + React Three Fiber 3D experience (editorial design, procedural scenes, 58-s walkthrough)
 ios/               Xcode project spec (XcodeGen), SwiftUI companion, DAT transport adapter, WKWebView lens bridge
 scripts/           seed, vision/grocery tests, fake phone, listing measurement/warming, performance, migrations
 docs/              PAYMENTS, ACCOUNTS_AND_DATA, PERFORMANCE, DEPLOYMENT, SUBMISSION, CHANGELOG, COVERAGE

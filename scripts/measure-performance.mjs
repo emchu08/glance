@@ -1,24 +1,23 @@
 // Frame-timing benchmark for the lens and the 3D site. Uses Chrome via Playwright when available
-// (website/node_modules), otherwise prints manual instructions. Results are written to measurements/.
+// (installed with npm i -D playwright), otherwise prints manual instructions. Results are written to measurements/.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { baseUrl } from "./_env.mjs";
 
 const pages = [
   { name: "lens-sample-glimpse", url: `${baseUrl}/lens?screen=offers-photo&source=sample`, ms: 6000 },
   { name: "glasses-picker", url: `${baseUrl}/glasses`, ms: 6000 },
-  { name: "website-3d", url: process.env.WEBSITE_URL ?? "http://localhost:5173/", ms: 10000 },
 ];
 let chromium;
-try { ({ chromium } = await import("playwright")); } catch { try { ({ chromium } = await import("../website/node_modules/playwright/index.mjs")); } catch { /* none */ } }
+try { ({ chromium } = await import("playwright")); } catch { /* none */ }
 if (!chromium) {
-  console.log("Playwright not found. Install it in website/ (npm ci) or run with Chrome DevTools → Performance. Record median, p95/p99 frame intervals, dropped frames.");
+  console.log("Playwright not found. Install it (npm i -D playwright) or run with Chrome DevTools → Performance. Record median, p95/p99 frame intervals, dropped frames.");
   process.exit(0);
 }
 let browser;
 try { browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined }); }
 catch (e) {
   console.log("Could not launch a browser:", String(e.message).split("\n")[0]);
-  console.log("Run `cd website && npx playwright install chromium` (downloads a browser), or set CHROME_PATH to an installed Chrome, then re-run.");
+  console.log("Run `npx playwright install chromium` (downloads a browser), or set CHROME_PATH to an installed Chrome, then re-run.");
   process.exit(0);
 }
 const results = [];
