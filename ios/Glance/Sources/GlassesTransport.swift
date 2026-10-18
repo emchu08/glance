@@ -11,13 +11,16 @@ protocol GlassesTransport: AnyObject {
     var name: String { get }
     var onState: ((AppModel.ConnectionState) -> Void)? { get set }
     var onCapabilities: ((DeviceCapabilities) -> Void)? { get set }
+    var onError: ((String) -> Void)? { get set }
+    var onControl: (@MainActor @Sendable (String, LensBridge.PublishedState) -> Void)? { get set }
     var onFrame: ((Data, Int, Int) -> Void)? { get set }
     func register(appID: String, clientToken: String) async throws
     func handleCallback(_ url: URL)
     func startCamera() async throws
     func stopCamera()
     /// Push a rendered 600×600 lens image to the glasses display when supported.
-    func present(lensImage: UIImage) async
+    func startDisplay() async throws
+    func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool
 }
 
 enum GlassesTransportFactory {
@@ -37,6 +40,8 @@ final class PhoneCameraTransport: NSObject, GlassesTransport, AVCaptureVideoData
     var onState: ((AppModel.ConnectionState) -> Void)?
     var onCapabilities: ((DeviceCapabilities) -> Void)?
     var onFrame: ((Data, Int, Int) -> Void)?
+    var onError: ((String) -> Void)?
+    var onControl: (@MainActor @Sendable (String, LensBridge.PublishedState) -> Void)?
     private let session = AVCaptureSession()
     private var lastSent = Date.distantPast
     private let queue = DispatchQueue(label: "glance.camera")
@@ -65,7 +70,8 @@ final class PhoneCameraTransport: NSObject, GlassesTransport, AVCaptureVideoData
         onState?(.sessionActive)
     }
     func stopCamera() { queue.async { [session] in session.stopRunning() } }
-    func present(lensImage: UIImage) async { /* no display on a phone transport */ }
+    func startDisplay() async throws {}
+    func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool { false }
 
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         // Throttle to ~1 fps for the relay; the lens decides when to analyze.
@@ -85,45 +91,3 @@ final class PhoneCameraTransport: NSObject, GlassesTransport, AVCaptureVideoData
         }
     }
 }
-
-#if canImport(MWDATCore)
-import MWDATCore
-#if canImport(MWDATCamera)
-import MWDATCamera
-#endif
-#if canImport(MWDATDisplay)
-import MWDATDisplay
-#endif
-#if canImport(MWDATInputs)
-import MWDATInputs
-#endif
-
-/// Official DAT adapter. Method names below follow the documented toolkit surface as of the pinned release;
-/// verify against the resolved package and adjust in one place. Registration/consent is Meta's documented flow.
-@MainActor
-final class DATTransport: GlassesTransport {
-    let name = "Meta Wearables DAT"
-    var onState: ((AppModel.ConnectionState) -> Void)?
-    var onCapabilities: ((DeviceCapabilities) -> Void)?
-    var onFrame: ((Data, Int, Int) -> Void)?
-
-    func register(appID: String, clientToken: String) async throws {
-        guard !appID.isEmpty else { onState?(.canceled); return }
-        // TODO(DAT): Wearables.configure(appID:clientToken:) and the registration/consent request go here.
-        // Map SDK outcomes to ConnectionState: .noMetaApp / .noDevice / .permissionDenied / .registered.
-        onState?(.registered)
-    }
-    func handleCallback(_ url: URL) {
-        // TODO(DAT): forward the glance:// callback to the SDK's URL handler and refresh capabilities.
-        onState?(.sessionActive)
-    }
-    func startCamera() async throws {
-        // TODO(DAT): open the camera stream from the device session; forward frames (JPEG ≤768px) to onFrame.
-    }
-    func stopCamera() {}
-    func present(lensImage: UIImage) async {
-        // TODO(DAT): when the display capability is available, push the image to the right-lens display.
-        // Event-driven, coalesced: only the latest revision is sent; no 60 fps snapshot loop.
-    }
-}
-#endif

@@ -18,6 +18,7 @@ website/.env.local
 # native
 ios/DerivedData
 ios/*.xcodeproj/xcuserdata
+ios/*.xcodeproj/project.xcworkspace/xcuserdata
 ios/*.xcworkspace/xcuserdata
 ios/.build
 # misc

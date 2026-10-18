@@ -7,10 +7,10 @@
   --lens-size: 600px;
   --lens-margin: 36px;
   --lens-accent: #a9cdf5;
-  --lens-pay: #635bff;
-  --lens-best: #7ee2a8;
-  --lens-saved: #ff6b8a;
-  --lens-warn: #ffc266;
+  --lens-pay: #3c6cf0;
+  --lens-best: #a9cdf5;
+  --lens-saved: #d8eaff;
+  --lens-warn: #d8eaff;
   --lens-text: #ffffff;
   --lens-muted: rgba(255, 255, 255, 0.64);
   --lens-faint: rgba(255, 255, 255, 0.38);
@@ -32,8 +32,8 @@
   contain: strict;
 }
 .lens[data-mode="glimpse"] { --lens-accent: #a9cdf5; }
-.lens[data-mode="grocery"] { --lens-accent: #9be6c5; }
-.lens[data-mode="gourmet"] { --lens-accent: #f4c98b; }
+.lens[data-mode="grocery"] { --lens-accent: #a9cdf5; }
+.lens[data-mode="gourmet"] { --lens-accent: #a9cdf5; }
 .lens * { box-sizing: border-box; }
 
 /* Header */
@@ -74,7 +74,7 @@
 .lens-chip:active { transform: scale(0.97); }
 .lens-chip.is-mode { border-color: var(--lens-accent); color: var(--lens-accent); }
 .lens-chip.is-mode .lens-chip-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--lens-accent); }
-.lens-chip.is-wallet.is-ready { border-color: rgba(99, 91, 255, 0.7); }
+.lens-chip.is-wallet.is-ready { border-color: rgba(169, 205, 245, 0.7); }
 .lens-chip svg { width: 22px; height: 22px; flex: none; }
 
 /* Content */
@@ -215,25 +215,26 @@
 }
 .lens-pill:active { transform: scale(0.97); }
 .lens-pill.is-primary { background: var(--lens-accent); border-color: var(--lens-accent); color: #0b0f14; }
-.lens-pill.is-pay { background: #ffffff; border-color: #ffffff; color: #1a1750; }
+.lens-pill.is-pay { background: #ffffff; border-color: #ffffff; color: #12336b; }
 .lens-pill.is-pay::before { content: ""; width: 14px; height: 14px; border-radius: 4px; background: var(--lens-pay); flex: none; }
-.lens-pill.is-danger { border-color: rgba(255, 107, 138, 0.8); color: var(--lens-saved); }
+.lens-pill.is-danger { border-color: rgba(169, 205, 245, 0.8); color: var(--lens-saved); }
 .lens-pill.is-quiet { border-color: rgba(255,255,255,0.3); color: var(--lens-muted); font-size: 26px; }
 .lens-pill[disabled] { opacity: 0.55; cursor: default; }
 .lens-pill svg { width: 30px; height: 30px; flex: none; }
 .lens-actions.is-single .lens-pill { flex: 0 0 auto; min-width: 300px; margin: 0 auto; }
 
-/* Focus ring: 4px white, inset −9px, light-blue glow */
+/* Inset focus remains visible inside overflow-clipped pills and rows. */
 .is-focused::after,
 .lens-chip.is-focused::after,
 .lens-pill.is-focused::after,
 .lens-key.is-focused::after {
   content: "";
   position: absolute;
-  inset: -9px;
+  inset: 3px;
   border-radius: inherit;
-  border: 4px solid #fff;
-  box-shadow: 0 0 0 3px rgba(169, 205, 245, 0.35), 0 0 24px rgba(169, 205, 245, 0.45);
+  border: 4px solid #a9cdf5;
+  box-shadow: 0 0 0 2px #123b64;
+  z-index: 2;
   pointer-events: none;
 }
 .lens-row.is-focused::after { border-radius: 28px; }
@@ -266,7 +267,7 @@
 .lens-tag.is-accent { border-color: var(--lens-accent); color: var(--lens-accent); }
 .lens-tag.is-best { border-color: var(--lens-best); color: var(--lens-best); }
 .lens-tag.is-sponsored { border-color: var(--lens-warn); color: var(--lens-warn); }
-.lens-tag.is-pay { border-color: rgba(99,91,255,0.9); color: #c9c5ff; }
+.lens-tag.is-pay { border-color: rgba(169,205,245,0.9); color: #a9cdf5; }
 .lens-dots { display: flex; gap: 8px; align-items: center; }
 .lens-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.28); display: block; }
 .lens-dots i.is-on { background: #fff; width: 22px; border-radius: 4px; }
@@ -288,8 +289,8 @@
 .lens-badge {
   width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 14px;
 }
-.lens-badge.is-ok { background: var(--lens-best); color: #0b1a12; }
-.lens-badge.is-warn { background: var(--lens-warn); color: #2a1a00; }
+.lens-badge.is-ok { background: var(--lens-best); color: #0b172a; }
+.lens-badge.is-warn { background: var(--lens-warn); color: #0b172a; }
 .lens-badge.is-pay { background: #fff; color: var(--lens-pay); }
 .lens-badge svg { width: 48px; height: 48px; }
 
@@ -352,3 +353,22 @@
 
 /* Native snapshot mode disables transitions */
 .lens.is-instant * { transition: none !important; animation: none !important; }
+
+/* Native and browser mode pickers share the white-and-blue brand palette. */
+.lens-wheel-row { color: #fff !important; }
+.lens-wheel-row.is-focused { color: var(--lens-accent) !important; }
+
+/* Companion scan status occupies the existing grocery heading. */
+.glance-native-activity { flex: none; margin-bottom: 10px; padding: 10px 14px; border: 2px solid #a9cdf5; border-radius: 16px; background: #102840; color: white; }
+.glance-native-activity strong { display: block; font-size: 25px; line-height: 1.15; }
+.glance-native-activity span { display: block; margin-top: 4px; font-size: 18px; line-height: 1.2; color: #d8eaff; }
+.lens-body:has(.glance-native-activity) > .lens-title { display: none; }
+.lens-body:has(.glance-native-activity) .lens-figure { font-size: 54px; }
+.lens-body:has(.glance-native-activity) .lens-row { min-height: 62px; }
+.lens-body:has(.glance-native-activity) .lens-row-label { font-size: 24px; }
+.lens-body:has(.glance-native-activity) .lens-row-hint { font-size: 17px; }
+.lens [data-action-id].is-focused { outline: 3px solid #a9cdf5; outline-offset: -3px; }
+
+.lens [data-action-id].is-focused { background: #fff !important; color: #123b64 !important; }
+.lens [data-action-id].is-focused .lens-row-hint,
+.lens [data-action-id].is-focused .lens-row-aside { color: #2a527a !important; }

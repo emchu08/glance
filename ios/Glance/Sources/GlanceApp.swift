@@ -16,10 +16,7 @@ struct GlanceApp: App {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     var body: some View {
-        TabView {
-            GlanceTab().tabItem { Label("Glance", systemImage: "eyeglasses") }
-            SettingsTab().tabItem { Label("Settings", systemImage: "gear") }
-        }
+        LauncherView()
         .task { await model.start() }
     }
 }

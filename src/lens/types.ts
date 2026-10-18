@@ -299,8 +299,8 @@ export const ROOT_SCREEN: Record<Mode, ScreenId> = { glimpse: "glimpse", grocery
 
 export const MODE_META: Record<Mode, { label: string; color: string; hint: string; icon: "scan" | "basket" | "dish" }> = {
   glimpse: { label: "Glimpse", color: "#A9CDF5", hint: "Shop what you see", icon: "scan" },
-  grocery: { label: "Grocery", color: "#9BE6C5", hint: "Track your cart", icon: "basket" },
-  gourmet: { label: "Gourmet", color: "#F4C98B", hint: "Cook what you see", icon: "dish" },
+  grocery: { label: "Grocery", color: "#A9CDF5", hint: "Track your cart", icon: "basket" },
+  gourmet: { label: "Gourmet", color: "#A9CDF5", hint: "Cook what you see", icon: "dish" },
 };
 
-export const PAY_COLOR = "#635BFF";
+export const PAY_COLOR = "#3C6CF0";

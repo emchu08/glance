@@ -1,0 +1,650 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0ACADE81F34FEBEA497D002C /* GlanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EC93E54491A277DC1DF851 /* GlanceTests.swift */; };
+		1088E9F36132CCD23331605D /* GlanceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A50FBF6CBA27865990D68D3 /* GlanceApp.swift */; };
+		1B589C60454C1C6B07BB50A0 /* MWDATDisplay in Frameworks */ = {isa = PBXBuildFile; productRef = D9FB2FF46A9FFFC6DBB3B57E /* MWDATDisplay */; };
+		1BB584C29AD89F72CF13BC03 /* lens.css in Resources */ = {isa = PBXBuildFile; fileRef = 698581C1E37189048BC78FF2 /* lens.css */; };
+		456C066A5BF8C2282862A147 /* GlassesTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE679656A103319CBA970705 /* GlassesTransport.swift */; };
+		48A34E75C2D9A06E4A6F93B1 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ACDE36124B199FBD73EA6D2 /* Views.swift */; };
+		508804CD84F27A12CF0C0AA0 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3B1DA07CFDCE092F340CAD9C /* MWDATCore */; };
+		53635034AF527AD02096A3D1 /* GlanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0E6EAD1D8048C2008DC372 /* GlanceUITests.swift */; };
+		57E21A5C2FF845D13E0D25BC /* MWDATInputs in Frameworks */ = {isa = PBXBuildFile; productRef = 2A015AE0F5E87C7C3995F255 /* MWDATInputs */; };
+		5D498AAC383E0612290F675D /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19DBB11629BD08447C164A2B /* AppModel.swift */; };
+		7C745B75C778A40DAB76C560 /* DATTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD38E557AC764640AC4D082A /* DATTransport.swift */; };
+		8F3719EBCB279B824649DE5C /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993FFBEEDF57F07532547183 /* RelayClient.swift */; };
+		93ADF0F7A5750B92F7292FCB /* native-lens.js in Resources */ = {isa = PBXBuildFile; fileRef = 6103973D575A9D6EF6D5C2DB /* native-lens.js */; };
+		B6840A9E78AA5972231843F3 /* LensBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30208B4FF58CE9AB1DA7338 /* LensBridge.swift */; };
+		B7D0536BB572326DAE8768C3 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 987FEF33821EDA710FBA8E98 /* MWDATCamera */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		073AEBC413AECBE9628AE49F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 070164DEC24115A8F4F2D9F7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5796247D68EDA6C8F0512954;
+			remoteInfo = Glance;
+		};
+		4A896AE07C4E38DED14E59D7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 070164DEC24115A8F4F2D9F7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5796247D68EDA6C8F0512954;
+			remoteInfo = Glance;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		19DBB11629BD08447C164A2B /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		1B1BE2303D621C4C78C622FA /* GlanceTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlanceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D1F7199055C486F8518FE80 /* GlanceUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GlanceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A50FBF6CBA27865990D68D3 /* GlanceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceApp.swift; sourceTree = "<group>"; };
+		5ACDE36124B199FBD73EA6D2 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
+		6103973D575A9D6EF6D5C2DB /* native-lens.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "native-lens.js"; sourceTree = "<group>"; };
+		698581C1E37189048BC78FF2 /* lens.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = lens.css; sourceTree = "<group>"; };
+		993FFBEEDF57F07532547183 /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		AD38E557AC764640AC4D082A /* DATTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DATTransport.swift; sourceTree = "<group>"; };
+		B30208B4FF58CE9AB1DA7338 /* LensBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensBridge.swift; sourceTree = "<group>"; };
+		CD0E6EAD1D8048C2008DC372 /* GlanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceUITests.swift; sourceTree = "<group>"; };
+		CE679656A103319CBA970705 /* GlassesTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassesTransport.swift; sourceTree = "<group>"; };
+		D3EC93E54491A277DC1DF851 /* GlanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceTests.swift; sourceTree = "<group>"; };
+		E6681C13BACBBD0D74A80EB4 /* Glance.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Glance.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F1692AA5A14C8B9B17915D27 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				508804CD84F27A12CF0C0AA0 /* MWDATCore in Frameworks */,
+				B7D0536BB572326DAE8768C3 /* MWDATCamera in Frameworks */,
+				1B589C60454C1C6B07BB50A0 /* MWDATDisplay in Frameworks */,
+				57E21A5C2FF845D13E0D25BC /* MWDATInputs in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		114415D1B3857C96692A5BB3 /* lens */ = {
+			isa = PBXGroup;
+			children = (
+				698581C1E37189048BC78FF2 /* lens.css */,
+			);
+			path = lens;
+			sourceTree = "<group>";
+		};
+		1A7345DEDC89903C9907667A = {
+			isa = PBXGroup;
+			children = (
+				F770F9C5C342F99F4D4564C0 /* Glance */,
+				B92E7695B6685B687D9B84F3 /* Glance */,
+				897E7B5C0E3778F8AD681930 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		897E7B5C0E3778F8AD681930 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E6681C13BACBBD0D74A80EB4 /* Glance.app */,
+				1B1BE2303D621C4C78C622FA /* GlanceTests.xctest */,
+				4D1F7199055C486F8518FE80 /* GlanceUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8DA893ED8AA103827256A491 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				CD0E6EAD1D8048C2008DC372 /* GlanceUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		96FB2FC3AF3957551C408054 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				114415D1B3857C96692A5BB3 /* lens */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		96FBEE8CDE391BD7CDB73AA0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				6103973D575A9D6EF6D5C2DB /* native-lens.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		9C5AB2BA65C269BB74E1A417 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				D3EC93E54491A277DC1DF851 /* GlanceTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		B5425768693A8AF5FBF0359A /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				19DBB11629BD08447C164A2B /* AppModel.swift */,
+				AD38E557AC764640AC4D082A /* DATTransport.swift */,
+				5A50FBF6CBA27865990D68D3 /* GlanceApp.swift */,
+				CE679656A103319CBA970705 /* GlassesTransport.swift */,
+				B30208B4FF58CE9AB1DA7338 /* LensBridge.swift */,
+				993FFBEEDF57F07532547183 /* RelayClient.swift */,
+				5ACDE36124B199FBD73EA6D2 /* Views.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		B92E7695B6685B687D9B84F3 /* Glance */ = {
+			isa = PBXGroup;
+			children = (
+				96FB2FC3AF3957551C408054 /* src */,
+			);
+			name = Glance;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		F770F9C5C342F99F4D4564C0 /* Glance */ = {
+			isa = PBXGroup;
+			children = (
+				96FBEE8CDE391BD7CDB73AA0 /* Resources */,
+				B5425768693A8AF5FBF0359A /* Sources */,
+				9C5AB2BA65C269BB74E1A417 /* Tests */,
+				8DA893ED8AA103827256A491 /* UITests */,
+			);
+			path = Glance;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5796247D68EDA6C8F0512954 /* Glance */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8812D40211E0FBEAED4F31C9 /* Build configuration list for PBXNativeTarget "Glance" */;
+			buildPhases = (
+				32DD4C8A891B8A91C685238C /* Sources */,
+				A3C361D35F468850BEF053AB /* Resources */,
+				F1692AA5A14C8B9B17915D27 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Glance;
+			packageProductDependencies = (
+				3B1DA07CFDCE092F340CAD9C /* MWDATCore */,
+				987FEF33821EDA710FBA8E98 /* MWDATCamera */,
+				D9FB2FF46A9FFFC6DBB3B57E /* MWDATDisplay */,
+				2A015AE0F5E87C7C3995F255 /* MWDATInputs */,
+			);
+			productName = Glance;
+			productReference = E6681C13BACBBD0D74A80EB4 /* Glance.app */;
+			productType = "com.apple.product-type.application";
+		};
+		730743D4A79A9CA460D4AAA3 /* GlanceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E42C44E70143F871450ED2AE /* Build configuration list for PBXNativeTarget "GlanceTests" */;
+			buildPhases = (
+				04055F12A13560DA7F1C608D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				91BB2770CE1EACE60B39581C /* PBXTargetDependency */,
+			);
+			name = GlanceTests;
+			packageProductDependencies = (
+			);
+			productName = GlanceTests;
+			productReference = 1B1BE2303D621C4C78C622FA /* GlanceTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		FC0A9712B2B0A91E7EFC2FF4 /* GlanceUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E38810268000848D2EE3D6CE /* Build configuration list for PBXNativeTarget "GlanceUITests" */;
+			buildPhases = (
+				1BF6D06ABDC56F8AF44AC272 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B423A9784C4F14BDBB893C26 /* PBXTargetDependency */,
+			);
+			name = GlanceUITests;
+			packageProductDependencies = (
+			);
+			productName = GlanceUITests;
+			productReference = 4D1F7199055C486F8518FE80 /* GlanceUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		070164DEC24115A8F4F2D9F7 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					5796247D68EDA6C8F0512954 = {
+						DevelopmentTeam = 9UKLZF53Y4;
+						ProvisioningStyle = Automatic;
+					};
+					730743D4A79A9CA460D4AAA3 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					FC0A9712B2B0A91E7EFC2FF4 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 5796247D68EDA6C8F0512954;
+					};
+				};
+			};
+			buildConfigurationList = 13F7C570AC1AD3FDBC42720D /* Build configuration list for PBXProject "Glance" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 1A7345DEDC89903C9907667A;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CEA4A568D9C0BC36BBB186CA /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 897E7B5C0E3778F8AD681930 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5796247D68EDA6C8F0512954 /* Glance */,
+				730743D4A79A9CA460D4AAA3 /* GlanceTests */,
+				FC0A9712B2B0A91E7EFC2FF4 /* GlanceUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A3C361D35F468850BEF053AB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1BB584C29AD89F72CF13BC03 /* lens.css in Resources */,
+				93ADF0F7A5750B92F7292FCB /* native-lens.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		04055F12A13560DA7F1C608D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0ACADE81F34FEBEA497D002C /* GlanceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1BF6D06ABDC56F8AF44AC272 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				53635034AF527AD02096A3D1 /* GlanceUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		32DD4C8A891B8A91C685238C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D498AAC383E0612290F675D /* AppModel.swift in Sources */,
+				7C745B75C778A40DAB76C560 /* DATTransport.swift in Sources */,
+				1088E9F36132CCD23331605D /* GlanceApp.swift in Sources */,
+				456C066A5BF8C2282862A147 /* GlassesTransport.swift in Sources */,
+				B6840A9E78AA5972231843F3 /* LensBridge.swift in Sources */,
+				8F3719EBCB279B824649DE5C /* RelayClient.swift in Sources */,
+				48A34E75C2D9A06E4A6F93B1 /* Views.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		91BB2770CE1EACE60B39581C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5796247D68EDA6C8F0512954 /* Glance */;
+			targetProxy = 4A896AE07C4E38DED14E59D7 /* PBXContainerItemProxy */;
+		};
+		B423A9784C4F14BDBB893C26 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5796247D68EDA6C8F0512954 /* Glance */;
+			targetProxy = 073AEBC413AECBE9628AE49F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		49F89CE9BD8B0507FE45958A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Glance/Resources/Glance.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
+				DEVELOPMENT_TEAM = 9UKLZF53Y4;
+				INFOPLIST_FILE = Glance/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.glance.companion;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8615EFDFE825DB4EDCBE3FD3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.glance.GlanceTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glance.app/Glance";
+			};
+			name = Debug;
+		};
+		87B47B403F4DB955186774AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.glance.GlanceTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glance.app/Glance";
+			};
+			name = Release;
+		};
+		A778937A8AD8F70E6EF35964 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.glance.GlanceUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Glance;
+			};
+			name = Release;
+		};
+		B150CAF5937760C3EAA04123 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 3;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GLANCE_API_BASE = "https://glance-blue.vercel.app";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 1.0;
+				META_APP_ID = "";
+				META_CLIENT_TOKEN = "";
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		B302F37FB6801BCDAAD341DF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.glance.GlanceUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Glance;
+			};
+			name = Debug;
+		};
+		D05ED2ACEFCCF8F1506FF897 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Glance/Resources/Glance.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 9UKLZF53Y4;
+				INFOPLIST_FILE = Glance/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.glance.companion;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		F3EA50893C3F17C20F755C19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 3;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GLANCE_API_BASE = "https://glance-blue.vercel.app";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 1.0;
+				META_APP_ID = "";
+				META_CLIENT_TOKEN = "";
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		13F7C570AC1AD3FDBC42720D /* Build configuration list for PBXProject "Glance" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F3EA50893C3F17C20F755C19 /* Debug */,
+				B150CAF5937760C3EAA04123 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8812D40211E0FBEAED4F31C9 /* Build configuration list for PBXNativeTarget "Glance" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49F89CE9BD8B0507FE45958A /* Debug */,
+				D05ED2ACEFCCF8F1506FF897 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E38810268000848D2EE3D6CE /* Build configuration list for PBXNativeTarget "GlanceUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B302F37FB6801BCDAAD341DF /* Debug */,
+				A778937A8AD8F70E6EF35964 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E42C44E70143F871450ED2AE /* Build configuration list for PBXNativeTarget "GlanceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8615EFDFE825DB4EDCBE3FD3 /* Debug */,
+				87B47B403F4DB955186774AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CEA4A568D9C0BC36BBB186CA /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2A015AE0F5E87C7C3995F255 /* MWDATInputs */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CEA4A568D9C0BC36BBB186CA /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATInputs;
+		};
+		3B1DA07CFDCE092F340CAD9C /* MWDATCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CEA4A568D9C0BC36BBB186CA /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCore;
+		};
+		987FEF33821EDA710FBA8E98 /* MWDATCamera */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CEA4A568D9C0BC36BBB186CA /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCamera;
+		};
+		D9FB2FF46A9FFFC6DBB3B57E /* MWDATDisplay */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CEA4A568D9C0BC36BBB186CA /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATDisplay;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 070164DEC24115A8F4F2D9F7 /* Project object */;
+}
