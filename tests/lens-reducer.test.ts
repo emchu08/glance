@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { initialState, lensReducer } from "../src/lens/reducer.ts";
-import { describeScreen } from "../src/lens/screens.ts";
+import { describeScreen, publishedActions } from "../src/lens/screens.ts";
 import { defaultFocus, moveFocus } from "../src/lens/navigation.ts";
 import { fixtureState, FIXTURE_IDS, PAYMENT_FIXTURE_IDS } from "../src/lens/fixtures.ts";
 import type { LensState } from "../src/lens/types.ts";
@@ -71,6 +71,8 @@ test("every fixture describes a screen with reachable header and at least one en
       assert.ok(actions.some((a) => !a.disabled), `${id} ${live} has an enabled action`);
       const ids = new Set(actions.map((a) => a.id));
       assert.equal(ids.size, actions.length, `${id}: action ids are unique`);
+      // The iPhone app decodes row and x as integers; one fraction fails the whole message.
+      for (const p of publishedActions(actions, [])) assert.ok(Number.isInteger(p.row) && Number.isInteger(p.x), `${id}: ${p.id} publishes integer row/x`);
       // D-pad can reach the header from the default focus.
       if (s.screen.id !== "picker") {
         let cur = defaultFocus(actions);

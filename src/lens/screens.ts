@@ -491,4 +491,15 @@ function describeComposer(state: LensState): LensAction[] {
 }
 
 export const cartTotal = (state: LensState) => cartTotals(state.grocery.cart);
+
+/**
+ * Actions as the iPhone app receives them. Its decoder (installed builds included) reads `row` and
+ * `x` as integers, and a fraction would fail the whole message, so the phone would never see the
+ * lens as loaded. Rows are rounded; x is sent in hundredths.
+ */
+export function publishedActions(actions: LensAction[], rects: { id: string; x: number; y: number; width: number; height: number }[]) {
+  return actions.filter((a) => !a.disabled).map((a) => ({
+    id: a.id, label: a.label, row: Math.round(a.row), x: Math.round(a.x * 100), variant: a.variant, rect: rects.find((r) => r.id === a.id) ?? null,
+  }));
+}
 export type { Screen };

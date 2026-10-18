@@ -117,6 +117,9 @@ final class GlanceTests: XCTestCase {
         let s = try JSONDecoder().decode(LensBridge.PublishedState.self, from: Data(json.utf8))
         XCTAssertEqual(s.actions.first?.id, "buy")
         XCTAssertEqual(s.revision, 3)
+        // Fractional layout positions must not fail the whole message (the phone would never see the lens load).
+        let fractional = #"{"instance":"i","revision":4,"screen":"grocery","active":"scan","actions":[{"id":"scan","label":"Start scan","row":1.5,"x":0.82,"variant":"secondary","rect":null}]}"#
+        XCTAssertEqual(try JSONDecoder().decode(LensBridge.PublishedState.self, from: Data(fractional.utf8)).active, "scan")
     }
 }
 

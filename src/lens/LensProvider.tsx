@@ -7,7 +7,7 @@ import type { CaptureKind, Offer } from "@/data/types";
 import { createNativeAdapter, createSampleAdapter, createWebcamAdapter, type CaptureAdapter } from "./capture";
 import { moveFocus, moveLinear, reconcileFocus, type Direction } from "./navigation";
 import { initialState, lensReducer } from "./reducer";
-import { describeScreen, groceryQuery, isPayable } from "./screens";
+import { describeScreen, groceryQuery, isPayable, publishedActions } from "./screens";
 import { loadPersisted, savePersisted, PAIR_KEY, PHONE_CODE_KEY } from "./storage";
 import * as svc from "./services";
 import type { LensAction, LensEffect, LensEvent, LensState, OrderSummary } from "./types";
@@ -689,7 +689,7 @@ export function useLensInput(enabled = true) {
       const payload = {
         type: "state", instance, version: 1, revision: state.revision, screen: state.screen.id, params: state.screen.params ?? {},
         active: lens.focusId,
-        actions: actions.filter((a) => !a.disabled).map((a) => ({ id: a.id, label: a.label, row: a.row, x: a.x, variant: a.variant, rect: rects.find((r) => r.id === a.id) ?? null })),
+        actions: publishedActions(actions, rects),
         field: state.composer ? { id: state.composer.field, value: state.composer.value } : null,
       };
       w.webkit?.messageHandlers?.glance?.postMessage(payload);

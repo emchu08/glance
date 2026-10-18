@@ -17,9 +17,10 @@ const fs = require('node:fs');
     await page.route('**/api/glance/grocery/item', route => route.fulfill({ json: { insight: null } }));
     await page.addInitScript(() => {
       window.nativeMessages = [];
+      window.lensStates = [];
       window.frameAvailable = false;
       window.webkit = { messageHandlers: {
-        glance: { postMessage: () => {} },
+        glance: { postMessage: m => { window.lensStates.push(JSON.parse(JSON.stringify(m))); } },
         glanceNative: { postMessage: async m => {
           window.nativeMessages.push(m);
           if (m.type === 'frame') {
@@ -99,7 +100,12 @@ const fs = require('node:fs');
     await page.locator('[data-action-id="hdr-wallet"]').click();
     await page.locator('[data-action-id="w-setup"]').click();
     await page.waitForFunction(() => window.nativeMessages.some(m => m.type === 'wallet'), null, { timeout: 5000 }).catch(() => assert.fail('Wallet handoff opens the phone sheet'));
+    // Every state the lens sent must decode on the iPhone, whose decoder reads row and x as integers.
+    const states = await page.evaluate(() => window.lensStates);
+    assert.ok(states.length > 10, 'The lens publishes its state to the phone');
+    const bad = states.flatMap(st => st.actions.filter(a => !Number.isInteger(a.row) || !Number.isInteger(a.x)).map(a => `${st.screen}:${a.id} row=${a.row} x=${a.x}`));
+    assert.deepEqual(bad.slice(0, 5), [], 'Published actions decode on the iPhone (integer row/x)');
     assert.deepEqual(errors, []);
-    console.log('PASS: opens on the picker with no intro, no pair code, camera status in the lens, Grocery says each thing once, camera-drop message, fresh native capture, pause, visible focus ring, listing error/empty, wallet handoff, no browser errors.');
+    console.log('PASS: opens on the picker with no intro, no pair code, camera status in the lens, Grocery says each thing once, camera-drop message, fresh native capture, pause, visible focus ring, listing error/empty, wallet handoff, states decode on the iPhone, no browser errors.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

@@ -12,7 +12,8 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
         let instance: String; let revision: Int; let screen: String; let active: String?; let actions: [PublishedAction]
     }
     struct PublishedAction: Decodable, Sendable, Equatable {
-        let id: String; let label: String; let row: Int; let x: Int; let variant: String; let rect: Rect?
+        // Numbers, not integers: the lens may lay actions out at fractional rows and positions.
+        let id: String; let label: String; let row: Double; let x: Double; let variant: String; let rect: Rect?
         struct Rect: Decodable, Sendable, Equatable { let x: Double; let y: Double; let width: Double; let height: Double }
     }
     private static let logger = Logger(subsystem: "com.glance.companion", category: "performance")
