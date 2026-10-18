@@ -2,27 +2,28 @@ import XCTest
 
 final class GlanceUITests: XCTestCase {
     @MainActor
-    func testLaunchConnectsAndBothModesAndWalletRemainAccessible() {
+    func testLaunchConnectsAndCameraGlanceSwitchAndWalletRemainAccessible() {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["phone-wallet"].waitForExistence(timeout: 10))
-        // Launch connects by itself and the Glance screens are always shown, never the camera picture.
-        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 20))
-        XCTAssertFalse(app.descendants(matching: .any)["camera-card"].exists)
-        let mode = app.segmentedControls["glasses-mode"]
-        XCTAssertTrue(mode.waitForExistence(timeout: 10))
+        // One mode: the glasses show Glance. The phone shows the glasses camera, or Glance on request.
+        XCTAssertFalse(app.segmentedControls["glasses-mode"].exists)
+        let view = app.segmentedControls["phone-view"]
+        XCTAssertTrue(view.waitForExistence(timeout: 10))
         XCTAssertEqual(app.tabBars.count, 0)
+        view.buttons["Camera"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["camera-preview"].waitForExistence(timeout: 10))
 
-        mode.buttons["Glasses web app"].tap()
+        view.buttons["Glance"].tap()
+        XCTAssertFalse(app.descendants(matching: .any)["camera-preview"].exists)
         let runtime = app.webViews.firstMatch
         XCTAssertTrue(runtime.waitForExistence(timeout: 20))
         XCTAssertGreaterThan(runtime.frame.width, 300)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Glance web app mode"
+        screenshot.name = "Glance on the phone"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-        XCTAssertTrue(app.buttons["copy-glasses-url"].waitForExistence(timeout: 10))
-        mode.buttons["Same as phone"].tap()
+        view.buttons["Camera"].tap()
 
         app.buttons["phone-wallet"].tap()
         XCTAssertTrue(app.buttons["wallet-done"].waitForExistence(timeout: 10))

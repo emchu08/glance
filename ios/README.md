@@ -1,31 +1,23 @@
 # Glance iPhone companion
 
 The companion uses Meta Wearables DAT **1.0.1** with Meta Ray-Ban Display. It
-connects to the glasses on launch (there is no start button). The phone always
-shows the Glance screens; the glasses camera only feeds recognition and its
-picture is never shown. The lens opens directly on the mode picker. **Wallet**
-opens account/card setup.
+connects to the glasses on launch (there is no start button). The lens opens
+directly on the mode picker. **Wallet** opens account/card setup.
 
-## Two ways to show Glance on the glasses
+## What each screen shows
 
-**Same as phone (default).** The glasses show the same Glance screens as the
-phone, with no setup. The display connects first and the camera joins behind it,
-so the screens never give way to the camera. Each changed screen is a full
-600×600 image over Bluetooth, so motion is limited by Bluetooth; unchanged
-screens are never resent.
+**Glasses:** the Glance screens, drawn by the phone. One DAT session runs the
+display and the camera together: the display connects first and the camera
+joins behind it, so the screens never give way to the camera. Each changed
+screen is a full 600×600 image over Bluetooth; unchanged screens are never resent.
 
-**Glasses web app (smoother, one-time setup).** The lens runs as a Meta Ray-Ban
-Display *Web App*, rendered by the glasses at their own frame rate. Web Apps
-cannot use the camera, so the phone streams the glasses camera (DAT, camera only)
-to the relay twice a second and the web app reads frames from there, under the
-phone's long-lived relay code carried in the web app's address. Setup, shown on
-the phone with a Copy button: Meta AI → Developer Mode → App Settings → Web Apps →
-Connect Web App → paste the address → open Glance from the glasses' app grid.
-When the phone is signed in, it hands the account to the glasses once (single
-use, two minutes) so Buy works there.
+**Phone:** a **Camera / Glance** switch above the square. Camera (the default)
+shows the live glasses camera; Glance shows the same screens as the glasses, and
+can be tapped. The Glance screens keep running underneath the camera, since the
+glasses' picture is taken from them.
 
-Not yet verified on hardware: whether DAT camera streaming continues while a
-Web App is in the foreground on the glasses. If it does not, use Mirror phone.
+There is no glasses web app mode: while the phone streams the glasses camera,
+that session holds the glasses display, so a web app on the glasses shows black.
 
 ## Run
 

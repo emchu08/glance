@@ -38,17 +38,11 @@ final class AppModel {
         }
     }
 
-    /// Where the lens runs. Mirroring (the default) shows the phone's screens on the glasses with no
-    /// setup. The glasses web app renders on the glasses themselves and needs a one-time Meta AI setup.
-    enum GlassesMode: String, CaseIterable, Identifiable {
-        case mirror, webApp
+    /// What the phone's screen shows. The glasses always show the Glance screens.
+    enum PhoneView: String, CaseIterable, Identifiable {
+        case camera, glance
         var id: String { rawValue }
-        var title: String { self == .webApp ? "Glasses web app" : "Same as phone" }
-        var detail: String {
-            self == .webApp
-                ? "Runs on the glasses for smoother motion. Needs a one-time setup in Meta AI."
-                : "The glasses show the same Glance screens as this phone. No setup."
-        }
+        var title: String { self == .camera ? "Camera" : "Glance" }
     }
 
     var connection: ConnectionState = .idle
@@ -57,15 +51,18 @@ final class AppModel {
     var history: [HandoffLink] = []
     let apiBase: URL = Config.apiBase
     var lastFrameAt: Date?
-    var glassesAppOpen = false
     var developerLog: [String] = []
     var errorMessage: String?
     var launchStatus = "Connecting to your glasses…"
     var showWallet = false
     var isLaunching = false
-    var mode: GlassesMode = GlassesMode(rawValue: UserDefaults.standard.string(forKey: AppModel.modeKey) ?? "") ?? .mirror
-    /// v2: earlier builds defaulted to the web app, which shows nothing on the glasses until it is set up.
-    private static let modeKey = "glance.glassesMode.v2"
+    var phoneView: PhoneView = PhoneView(rawValue: UserDefaults.standard.string(forKey: AppModel.phoneViewKey) ?? "") ?? .camera {
+        didSet { UserDefaults.standard.set(phoneView.rawValue, forKey: AppModel.phoneViewKey) }
+    }
+    private static let phoneViewKey = "glance.phoneView.v1"
+    /// The newest glasses camera frame, for the phone's Camera view (about 15 a second).
+    var cameraPreview: UIImage?
+    private var lastPreview = Date.distantPast
     private var uploading = false
     private var lastUpload = Date.distantPast
     private var cameraHealth: Task<Void, Never>?
@@ -111,9 +108,12 @@ final class AppModel {
             let now = Date()
             self.lastFrameAt = now
             self.lensBridge.receiveFrame(jpeg, width: w, height: h)
-            // The glasses web app reads frames from the relay; mirroring needs it only for link handoffs.
-            let interval: TimeInterval = self.mode == .webApp ? 0.4 : 1
-            guard !self.uploading, now.timeIntervalSince(self.lastUpload) >= interval else { return }
+            if self.phoneView == .camera, now.timeIntervalSince(self.lastPreview) >= 1.0 / 15 {
+                self.lastPreview = now
+                self.cameraPreview = UIImage(data: jpeg)
+            }
+            // The relay carries frames once a second; its reply brings links sent from the glasses.
+            guard !self.uploading, now.timeIntervalSince(self.lastUpload) >= 1 else { return }
             self.uploading = true
             self.lastUpload = now
             Task { await self.uploadFrame(jpeg, width: w, height: h); self.uploading = false }
@@ -129,7 +129,7 @@ final class AppModel {
         transport.onControl = { [weak self] control, state in self?.lensBridge.control(control, displayed: state) }
         lensBridge.onError = { [weak self] message in self?.reportError(message) }
         lensBridge.onSnapshot = { [weak self] image, state in
-            guard let self, self.mode == .mirror else { return false }
+            guard let self else { return false }
             do { return try await self.transport.present(lensImage: image, state: state) }
             catch { self.reportError(error.localizedDescription); return false }
         }
@@ -139,7 +139,7 @@ final class AppModel {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
-        log("started · api \(apiBase.absoluteString) · transport \(transport.name) · mode \(mode.rawValue)")
+        log("started · api \(apiBase.absoluteString) · transport \(transport.name)")
     }
 
     /// Connects on launch: the camera first, so frames flow before anything else is ready.
@@ -155,7 +155,7 @@ final class AppModel {
             self?.reportError("Registration timed out. Return from Meta AI and tap Reconnect.")
         }
         launchStatus = "Connecting to your glasses…"
-        log("connecting (\(mode.rawValue))")
+        log("connecting")
         do {
             try await transport.register(appID: Config.metaAppID, clientToken: Config.metaClientToken)
         } catch {
@@ -170,35 +170,21 @@ final class AppModel {
         defer { continuingLaunch = false }
         do {
             // The screens reach the glasses first; the camera joins behind them and never replaces them.
-            if mode == .mirror {
-                launchStatus = "Showing Glance on your glasses…"
-                try await lensBridge.waitUntilReady()
-                guard wantsLaunch else { return }
-                try await transport.startDisplay()
-                lensBridge.refresh()
-                guard wantsLaunch else { return }
-            }
+            launchStatus = "Showing Glance on your glasses…"
+            try await lensBridge.waitUntilReady()
+            guard wantsLaunch else { return }
+            try await transport.startDisplay()
+            lensBridge.refresh()
+            guard wantsLaunch else { return }
             launchStatus = "Starting the glasses camera…"
             try await transport.startCamera()
             guard wantsLaunch else { return }
             lensBridge.refresh()
             registrationDeadline?.cancel()
-            launchStatus = mode == .webApp ? "Camera connected." : "Glance is open on your glasses."
+            launchStatus = "Glance is open on your glasses."
             isLaunching = false
             wantsLaunch = false
         } catch { reportError(error.localizedDescription) }
-    }
-
-    func setMode(_ next: GlassesMode) {
-        guard next != mode else { return }
-        mode = next
-        UserDefaults.standard.set(next.rawValue, forKey: AppModel.modeKey)
-        log("mode → \(next.rawValue)")
-        // Display and controls belong to whichever side renders the lens; start the session again.
-        transport.reset()
-        isLaunching = false
-        wantsLaunch = false
-        Task { await openGlance() }
     }
 
     func reportError(_ message: String) {
@@ -216,33 +202,16 @@ final class AppModel {
         log("callback \(url.host ?? "")")
     }
 
-    /// Keeps the relay pairing alive and reports whether Glance is open on the glasses.
+    /// Keeps the relay pairing alive (it carries links sent from the glasses to this phone).
     private func refreshRelay() async {
         do {
             if !relayJoined { try await relay.join(); relayJoined = true }
-            let s = try await relay.status()
-            if s.lens, !glassesAppOpen, mode == .webApp { Task { await offerGlassesSignIn() } }
-            glassesAppOpen = s.lens
-            relayStatus = s.lens ? "Glance is open on your glasses" : "Glance isn’t open on your glasses"
+            _ = try await relay.status()
+            relayStatus = "Connected to Glance"
         } catch {
             relayJoined = false
             relayStatus = "Can’t reach Glance. Check your connection."
         }
-    }
-
-    /// The glasses browser keeps its own cookies. When this phone is signed in, offer the account to
-    /// the paired glasses for one sign-in (the server holds the offer for two minutes).
-    func offerGlassesSignIn() async {
-        let cookies = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
-            .filter { $0.domain.hasSuffix(Config.apiBase.host ?? "") && $0.name.hasPrefix("sb-") }
-        guard !cookies.isEmpty else { return }
-        var req = URLRequest(url: Config.apiBase.appending(path: "/api/auth/glasses"))
-        req.httpMethod = "POST"; req.timeoutInterval = 8
-        req.setValue("application/json", forHTTPHeaderField: "content-type")
-        for (name, value) in HTTPCookie.requestHeaderFields(with: cookies) { req.setValue(value, forHTTPHeaderField: name) }
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["code": Config.relayCode])
-        let ok = ((try? await URLSession.shared.data(for: req))?.1 as? HTTPURLResponse)?.statusCode == 200
-        log(ok ? "offered sign-in to the glasses" : "could not offer sign-in to the glasses")
     }
 
     func uploadFrame(_ jpeg: Data, width: Int, height: Int) async {
@@ -277,8 +246,6 @@ enum Config {
         return code
     }()
     static var lensURL: URL { URL(string: "https://glance-blue.vercel.app/lens?source=native&companion=4&pair=\(relayCode)")! }
-    /// What to enter in Meta AI → Web Apps. The same lens, rendered by the glasses themselves.
-    static var glassesAppURL: URL { URL(string: "https://glance-blue.vercel.app/lens?source=native&pair=\(relayCode)")! }
     static let relayAlphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
     static func makeRelayCode() -> String { String((0..<6).map { _ in relayAlphabet.randomElement()! }) }
     static func isRelayCode(_ s: String) -> Bool { s.count == 6 && s.allSatisfy { relayAlphabet.contains($0) } }

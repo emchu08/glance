@@ -99,14 +99,12 @@ final class GlanceTests: XCTestCase {
         XCTAssertEqual(sender.delivered?.revision, 3)
     }
 
-    func testRelayCodeIsStableAndCarriedByBothLensURLs() {
+    func testRelayCodeIsStableAndCarriedByTheLensURL() {
         XCTAssertTrue(Config.isRelayCode(Config.relayCode))
         XCTAssertEqual(Config.relayCode, Config.relayCode)
         XCTAssertFalse(Config.isRelayCode("ABC1I0"), "Ambiguous characters are never issued")
-        for url in [Config.lensURL, Config.glassesAppURL] {
-            XCTAssertTrue(url.absoluteString.contains("pair=\(Config.relayCode)"))
-            XCTAssertTrue(Config.allowsLensNavigation(url))
-        }
+        XCTAssertTrue(Config.lensURL.absoluteString.contains("pair=\(Config.relayCode)"))
+        XCTAssertTrue(Config.allowsLensNavigation(Config.lensURL))
     }
 
     func testConnectionRecoveryCopy() {

@@ -1,8 +1,8 @@
 import SwiftUI
 import WebKit
 
-/// The phone half of Glance: connects the glasses on launch and always shows the Glance screens.
-/// The glasses camera only feeds recognition; its picture is never shown here.
+/// The phone half of Glance: connects the glasses on launch, draws the Glance screens on them and
+/// streams their camera for scanning. The phone shows either that camera or the same Glance screens.
 struct LauncherView: View {
     @Environment(AppModel.self) private var model
     private let blue = Color(red: 0.16, green: 0.39, blue: 0.91)
@@ -23,30 +23,29 @@ struct LauncherView: View {
                         }.accessibilityIdentifier("phone-wallet")
                     }.foregroundStyle(blue)
 
-                    LensRuntimeView()
-                        .aspectRatio(1, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .accessibilityIdentifier("live-lens")
+                    Picker("On this phone", selection: $model.phoneView) {
+                        ForEach(AppModel.PhoneView.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("phone-view")
+
+                    // The lens always renders (the glasses' picture is taken from it); the camera covers it.
+                    ZStack {
+                        LensRuntimeView()
+                            .accessibilityIdentifier("live-lens")
+                        if model.phoneView == .camera { CameraPreview() }
+                    }
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
 
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         VStack(alignment: .leading, spacing: 14) {
                             ConnectionLine(blue: blue)
                             ConnectionCard(blue: blue)
-                            if model.mode == .webApp { GlassesAppCard(blue: blue) }
                         }
                     }
 
                     if !model.history.isEmpty { LinksCard(blue: blue) }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("On your glasses").font(.headline)
-                        Picker("On your glasses", selection: Binding(get: { model.mode }, set: { model.setMode($0) })) {
-                            ForEach(AppModel.GlassesMode.allCases) { Text($0.title).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .accessibilityIdentifier("glasses-mode")
-                        Text(model.mode.detail).font(.footnote).foregroundStyle(.secondary)
-                    }
                 }
                 .padding(20)
                 .frame(maxWidth: 620)
@@ -55,11 +54,7 @@ struct LauncherView: View {
         }
         .background(LinearGradient(colors: [.white, Color(red: 0.92, green: 0.96, blue: 1)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         .preferredColorScheme(.light)
-        .sheet(isPresented: $model.showWallet, onDismiss: {
-            model.lensBridge.walletReturned()
-            // Signing in on the phone also signs in the glasses web app.
-            if model.mode == .webApp { Task { await model.offerGlassesSignIn() } }
-        }) {
+        .sheet(isPresented: $model.showWallet, onDismiss: { model.lensBridge.walletReturned() }) {
             WalletView()
         }
     }
@@ -80,43 +75,22 @@ private struct ConnectionLine: View {
     }
 }
 
-/// Whether the glasses are running Glance, and the one-time setup when they aren't.
-private struct GlassesAppCard: View {
+/// The glasses camera, live. The Glance screens keep running underneath and on the glasses.
+private struct CameraPreview: View {
     @Environment(AppModel.self) private var model
-    let blue: Color
-    @State private var copied = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if model.glassesAppOpen {
-                Label("Glance is open on your glasses", systemImage: "checkmark.circle.fill").font(.headline).foregroundStyle(blue)
-                Text("Swipe to move, pinch to select. Keep this app open so the camera stays connected.")
-                    .font(.callout).foregroundStyle(.secondary)
-            } else {
-                Label("Open Glance on your glasses", systemImage: "eyeglasses").font(.headline).foregroundStyle(blue)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("1. In Meta AI, turn on Developer Mode, then go to App Settings → Web Apps → Connect Web App.")
-                    Text("2. Paste this address and save. It’s yours; it only needs doing once.")
-                    Text(Config.glassesAppURL.absoluteString)
-                        .font(.footnote.monospaced()).textSelection(.enabled)
-                        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-                    HStack {
-                        Button {
-                            UIPasteboard.general.url = Config.glassesAppURL
-                            copied = true
-                        } label: { Label(copied ? "Copied" : "Copy address", systemImage: copied ? "checkmark" : "doc.on.doc") }
-                            .buttonStyle(.borderedProminent).tint(blue)
-                            .accessibilityIdentifier("copy-glasses-url")
-                        ShareLink(item: Config.glassesAppURL) { Label("Share", systemImage: "square.and.arrow.up") }
-                            .buttonStyle(.bordered).tint(blue)
-                    }
-                    Text("3. Open Glance from the app grid on your glasses and pin it.")
+        // An overlay, so the frame fills the square without changing its size.
+        Color.black
+            .overlay {
+                if let image = model.cameraPreview, model.cameraLive {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    Label(model.isLaunching ? "Starting the glasses camera…" : "Glasses camera off", systemImage: "video.slash")
+                        .font(.callout).foregroundStyle(.white.opacity(0.7))
                 }
-                .font(.callout)
             }
-        }
-        .padding(16)
-        .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
+            .clipped()
+        .accessibilityIdentifier("camera-preview")
     }
 }
 
