@@ -5,6 +5,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { Candidate, DishHypothesis, GroceryObservation, Recipe } from "@/data/types";
 import { GROCERY_CATALOG } from "@/data/grocery";
+import { specificLabel } from "@/domain/glimpse/label";
 import { normalizedLabelKey } from "@/domain/grocery/matching";
 import { parseUsdLabel } from "@/domain/money";
 import { aiConfigured, env } from "./env";
@@ -40,22 +41,28 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 
 
 // ── Scene recognition (Glimpse) ──────────────────────────────────────────────
 
-const Detection = z.object({
-  object_type: z.string(),
+const SPECIFIC_NAME = "A name specific enough to shop for, at most 6 words, never a bare category like \"sweater\" or \"jacket\". Branded: brand + product line + model/flavor as shown, e.g. \"Celsius Sparkling Orange Energy Drink\", \"Patagonia Better Sweater Fleece Jacket\". Unbranded: color + material/pattern + style/cut + type, e.g. \"Charcoal cable-knit crew neck sweater\", \"Olive quilted hooded puffer jacket\"";
+const Seen = {
+  object_type: z.string().describe("The kind of object, e.g. \"sweater\""),
   category: z.string(),
-  brand: z.string(),
-  color: z.string(),
+  brand: z.string().describe("Only when its name, logo or distinctive packaging is visible; else empty"),
+  color: z.string().describe("Specific color, e.g. \"heather gray\", \"navy\", \"olive\""),
+  material: z.string().describe("Material, knit or pattern you can see, e.g. \"cable-knit wool\", \"denim\", \"quilted nylon\", \"plaid\"; empty if unclear"),
+  style: z.string().describe("Cut and details, e.g. \"crew neck\", \"hooded zip-up\", \"cropped bomber\", \"high-top\"; empty if unclear"),
+  product_name: z.string().describe(SPECIFIC_NAME),
   box: z.array(z.number()).length(4).describe("x1,y1,x2,y2 on a 0–1000 grid"),
-  product_name: z.string().describe("Exact product as printed or as its packaging shows: brand + product line + flavor/variant, e.g. \"Celsius Sparkling Orange Energy Drink\"; empty if unknown"),
+};
+const Detection = z.object({
+  ...Seen,
   variant: z.string(),
   confidence: z.number(),
   description: z.string(),
-  search_query: z.string().describe("The most specific shopping search: brand, product name, variant and size when known"),
+  search_query: z.string().describe("The most specific shopping search: brand, product name, variant and size when known; else color, material, style and type"),
 });
 const SceneSchema = z.object({
   found: z.boolean(),
   primary: Detection.nullable(),
-  others: z.array(z.object({ object_type: z.string(), category: z.string(), brand: z.string(), color: z.string(), box: z.array(z.number()).length(4) })),
+  others: z.array(z.object(Seen)),
 });
 
 function boxFrom(grid: number[]): Candidate["box"] | undefined {
@@ -69,7 +76,7 @@ export async function recognizeScene(image: string): Promise<{ candidates: Candi
   const res = await anthropic().messages.parse({
     model: MODEL(),
     max_tokens: 2000,
-    system: `You are the vision module of a shopping assistant for smart glasses. Return visible shoppable objects only (clothing, bags, shoes, electronics, packaged goods). ${SAFETY} Identify products as precisely as the image allows: read the logo, name, flavor and size on the packaging, and name the exact product (a Celsius can is "Celsius Sparkling Orange Energy Drink", not "energy drink can"). A brand is visibly supported when its name, logo or distinctive packaging is in view; only when none is, leave brand and product_name empty and describe the item specifically (color, material, style).`,
+    system: `You are the vision module of a shopping assistant for smart glasses. Return visible shoppable objects only (clothing, bags, shoes, electronics, packaged goods). ${SAFETY} Identify products as precisely as the image allows: read the logo, name, flavor and size on the packaging, and name the exact product (a Celsius can is "Celsius Sparkling Orange Energy Drink", not "energy drink can"). A brand is visibly supported when its name, logo or distinctive packaging is in view; when none is, leave brand empty. Every product_name, for the primary object and the others, must be specific enough to shop for: never just a category. For clothing and other unbranded items, look closely at the color, material, knit or pattern, cut and details (collar, hood, zip, pockets, fit) and name the item by them, e.g. "Charcoal cable-knit crew neck sweater", not "Sweater"; "Olive quilted hooded puffer jacket", not "Jacket".`,
     messages: [{ role: "user", content: [imageBlock(image), { type: "text", text: "Identify the primary shoppable object the wearer is most likely looking at (centered, prominent) and other visible shoppable objects." }] }],
     output_config: { format: zodOutputFormat(SceneSchema), effort: QUICK },
   });
@@ -77,18 +84,13 @@ export async function recognizeScene(image: string): Promise<{ candidates: Candi
   const out = res.parsed_output;
   if (!out || !out.found || !out.primary) return { candidates: [], query: null, model: res.model };
   const p = out.primary;
-  const label = productLabel(p);
-  const primary: Candidate = { id: `live-${normalizedLabelKey(label)}-0`, label, category: p.category || "other", attributes: [p.color, p.variant].filter(Boolean), confidence: clamp01(p.confidence), box: boxFrom(p.box), brand: p.brand || undefined, variant: p.variant || undefined, primary: true };
-  const others = out.others.slice(0, 4).map((o, i) => ({ id: `live-${normalizedLabelKey(productLabel(o))}-${i + 1}`, label: productLabel(o), category: o.category || "other", attributes: [o.color].filter(Boolean), confidence: 0.5, box: boxFrom(o.box), brand: o.brand || undefined }));
+  const label = specificLabel(p);
+  const primary: Candidate = { id: `live-${normalizedLabelKey(label)}-0`, label, category: p.category || "other", attributes: [p.color, p.material, p.style, p.variant].filter(Boolean), confidence: clamp01(p.confidence), box: boxFrom(p.box), brand: p.brand || undefined, variant: p.variant || undefined, primary: true };
+  const others = out.others.slice(0, 4).map((o, i) => {
+    const name = specificLabel(o);
+    return { id: `live-${normalizedLabelKey(name)}-${i + 1}`, label: name, category: o.category || "other", attributes: [o.color, o.material, o.style].filter(Boolean), confidence: 0.5, box: boxFrom(o.box), brand: o.brand || undefined };
+  });
   return { candidates: [primary, ...others], query: p.search_query || null, model: res.model };
-}
-
-/** The exact product when it's known, else the brand with the kind of object, never just the kind. */
-function productLabel(d: { object_type: string; brand: string; product_name?: string }): string {
-  const name = d.product_name?.trim();
-  if (name) return cap(name);
-  const brand = d.brand.trim();
-  return cap(brand && !d.object_type.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${d.object_type}` : d.object_type);
 }
 
 const estimateCents = (usd: number | null) => (usd !== null && usd > 0 && usd < 1000 ? Math.round(usd * 100) : null);

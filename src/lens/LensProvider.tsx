@@ -464,6 +464,37 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
           });
         break;
       }
+      case "demo-purchase": {
+        const offer = findOffer(s, effect.offerId);
+        if (!offer || offer.priceCents === null) break;
+        if (purchaseInFlight.current === effect.attemptKey) break;
+        purchaseInFlight.current = effect.attemptKey;
+        const c = begin("purchase");
+        timed("purchase", () => svc.demoPurchase(offer, effect.attemptKey, c.signal))
+          .then((pay) => {
+            if (c.signal.aborted) return;
+            if (pay.status !== "succeeded") { dispatch({ type: "payment/status", status: "error", error: "The test card was declined." }); return; }
+            if (offer.sponsored) svc.recordAdClick(offer.sponsored.attributionToken);
+            const order: OrderSummary = {
+              id: pay.id, merchantName: offer.retailer, totalCents: pay.totalCents, currency: "USD", status: "paid", paymentStatus: "succeeded", fulfillmentStatus: "demo",
+              createdAt: pay.createdAt, lines: [{ name: offer.name, quantity: 1, lineTotalCents: pay.totalCents }], reference: pay.reference, cardSummary: pay.card, mode: s.mode,
+            };
+            dispatch({ type: "payment/status", status: "confirmed", orderId: pay.id, order });
+            // The listing still goes to the phone (where the item can actually be ordered). Sent quietly so
+            // the Done! screen stays up; one retry, like the handoff effect.
+            const code = pairBox.current;
+            if (!code) { dispatch({ type: "payment/phone-link", status: "unpaired" }); return; }
+            // Relative links (the demo seller's) stay relative: the server resolves them against APP_URL.
+            dispatch({ type: "payment/phone-link", status: "sending" });
+            const send = () => svc.sendHandoff(code, "buy", `Bought: ${offer.name}`, offer.url);
+            send().catch(() => new Promise((r) => setTimeout(r, 800)).then(send))
+              .then(() => dispatch({ type: "payment/phone-link", status: "sent" }))
+              .catch((e) => { log(`phone link failed: ${(e as Error).message}`); dispatch({ type: "payment/phone-link", status: "failed" }); });
+          })
+          .catch((e: svc.ServiceError) => { if (!c.signal.aborted) dispatch({ type: "payment/status", status: "error", error: e.message || "Payment failed" }); })
+          .finally(() => { if (purchaseInFlight.current === effect.attemptKey) purchaseInFlight.current = null; });
+        break;
+      }
       case "purchase":
       case "retry-purchase": {
         // The Buy action dispatched payment/submit synchronously; the reducer state lands on the next render,
@@ -517,7 +548,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         : "pending";
       dispatch({ type: "payment/status", status, orderId: o.id, order: o, error: status === "error" ? "Card declined" : undefined });
     }
-  }, [dispatch, fixture, log, coolDown]);
+  }, [dispatch, fixture, log, coolDown, pairBox]);
 
   // ── Grocery sampler: 3 s, single in-flight, drops busy ticks ──────────────
   const groceryBusy = useRef(false);

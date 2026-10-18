@@ -110,27 +110,16 @@ export function payingFor(state: LensState, offer: Offer | null): boolean {
 
 /**
  * An offer card's actions: the card itself opens the listing, then ‹ Buy [Add to cart | Remove] ›.
- * ‹ › are always there so focus doesn't jump as more listings stream in. Buy is a real
- * in-lens purchase for the connected seller; other stores' Buy sends the page to the phone.
+ * ‹ › are always there so focus doesn't jump as more listings stream in. Buy pays on the glasses
+ * with Stripe's test card (no sign-in, no saved card), then sends the listing to the paired phone;
+ * a listing without a price can't be charged, so its Buy only sends the page to the phone.
  */
 function cardActions(state: LensState, offer: Offer | null, step: (d: 1 | -1) => LensAction["events"], secondary: LensAction): LensAction[] {
   if (!offer) return [];
   if (payingFor(state, offer)) return paymentActions(state);
-  const pay = state.payment;
-  let buy: LensAction;
-  if (isPayable(offer)) {
-    if (state.wallet.status !== "ready") {
-      buy = act("buy", "Set up wallet", 2, 0.36, [{ type: "nav/push", screen: { id: "wallet" } }], { variant: "primary", effect: { kind: "wallet-refresh" } });
-    } else if (pay.offerId === offer.id && pay.status === "ready" && pay.quote) {
-      buy = act("buy", `Buy ${formatCents(pay.quote.totalCents)}`, 2, 0.36, [{ type: "payment/submit", attemptKey: `${pay.quote.version}:${state.session}` }], { variant: "pay", effect: { kind: "purchase", offerId: offer.id } });
-    } else if (pay.offerId === offer.id && pay.status === "quoting") {
-      buy = act("buy", "Getting total…", 2, 0.36, [], { variant: "pay", disabled: true });
-    } else {
-      buy = act("buy", "Buy", 2, 0.36, [{ type: "payment/quoting", offerId: offer.id, originMode: state.mode }], { variant: "primary", effect: { kind: "quote", offerId: offer.id } });
-    }
-  } else {
-    buy = act("buy", "Buy", 2, 0.36, [], { variant: "primary", effect: { kind: "handoff", handoffKind: "buy", title: offer.name, url: offer.url } });
-  }
+  const buy: LensAction = offer.priceCents === null
+    ? act("buy", "Buy", 2, 0.36, [], { variant: "primary", effect: { kind: "handoff", handoffKind: "buy", title: offer.name, url: offer.url } })
+    : demoBuy(state, offer, `Buy ${formatCents(offer.priceCents)}`);
   return [
     buy,
     secondary,
@@ -138,6 +127,12 @@ function cardActions(state: LensState, offer: Offer | null, step: (d: 1 | -1) =>
     act("offer-prev", "Previous offer", 2, 0.06, step(-1)),
     act("offer-next", "Next offer", 2, 0.94, step(1)),
   ];
+}
+
+/** Pay with Stripe's test card. Each press has its own attempt key; a repeat while paying is ignored. */
+function demoBuy(state: LensState, offer: Offer, label: string, id = "buy", row = 2, x = 0.36): LensAction {
+  const attemptKey = `${offer.id}:${state.session}:${state.revision}`;
+  return act(id, label, row, x, [{ type: "payment/demo-start", offerId: offer.id, originMode: state.mode, attemptKey }], { variant: "pay", effect: { kind: "demo-purchase", offerId: offer.id, attemptKey } });
 }
 
 /** Add to cart: Grocery's own cart in Grocery (at the listing's price), the shopping cart in Glimpse and Gourmet. */
@@ -150,6 +145,17 @@ function cartAdd(state: LensState, offer: Offer | null): LensAction {
 
 function paymentActions(state: LensState): LensAction[] {
   const p = state.payment;
+  if (p.demo) {
+    const offer = findPaidOffer(state, p.offerId);
+    switch (p.status) {
+      case "pending": return [act("pay-wait", "Paying…", 2, 0.5, [], { variant: "pay", disabled: true })];
+      case "confirmed": case "accepted": return [act("pay-done", "Done", 2, 0.5, [{ type: "payment/clear" }], { variant: "primary" })];
+      default: return [
+        ...(offer && offer.priceCents !== null ? [demoBuy(state, offer, "Try again", "pay-retry", 2, 0.3)] : []),
+        act("pay-back", "Back", 2, 0.72, [{ type: "payment/clear" }]),
+      ];
+    }
+  }
   switch (p.status) {
     case "pending":
       return [act("pay-wait", "Paying…", 2, 0.5, [], { variant: "pay", disabled: true })];
@@ -173,6 +179,11 @@ function paymentActions(state: LensState): LensAction[] {
     default:
       return [];
   }
+}
+
+function findPaidOffer(state: LensState, id: string | null): Offer | null {
+  if (!id) return null;
+  return state.glimpse.offers.find((o) => o.id === id) ?? state.listings.offers.find((o) => o.id === id) ?? state.glimpse.saved.find((o) => o.id === id) ?? null;
 }
 
 function recipeOf(state: LensState, id: string) {
@@ -470,10 +481,8 @@ export function describeScreen(state: LensState): LensAction[] {
           act("w-done", "Done", 3, 0.5, [{ type: "nav/back" }], { variant: "primary" }),
         ];
       }
-      return [...h,
-        act("w-setup", w.status === "signed-out" ? "Set up on phone" : "Add a card on phone", 3, 0.3, [], { variant: "primary", effect: { kind: "handoff", handoffKind: "checkout", title: "Set up your Glance wallet", url: "/wallet/setup" } }),
-        act("w-refresh", "Refresh", 3, 0.75, [], { effect: { kind: "wallet-refresh" } }),
-      ];
+      // No saved card needed: Buy pays with Stripe's test card on the glasses.
+      return [...h, act("w-done", "Done", 3, 0.5, [{ type: "nav/back" }], { variant: "primary" })];
     }
     case "wallet-orders": {
       const orders = state.wallet.orders;

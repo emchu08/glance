@@ -16,7 +16,7 @@ import { formatAmounts, paginateSteps, scaleIngredients } from "@/domain/gourmet
 import { formatCents } from "@/domain/money";
 import { useLens } from "./LensProvider";
 import { groceryCardPrice } from "./groceryPrice";
-import { compareOffers, currentOffer, groceryOnline, isPayable, payingFor } from "./screens";
+import { compareOffers, currentOffer, groceryOnline, payingFor } from "./screens";
 import type { LensState } from "./types";
 import {
   Act, AMBER, BLUE, BottomRow, CardButtons, CardSkeleton, Center, Eyebrow, FrameCrop, LensField, OfferCard, OfferPhoto, Pill, RowList, Spinner,
@@ -271,14 +271,14 @@ function GlimpseCandidates() {
 
 /* ── Offer cards (Glimpse offers, online listings, cart items) ────────────── */
 
-/** The line under the chips for a buy-in-lens offer: the card it will charge, or the quote. */
-function payNote(state: LensState, offer: Offer): ReactNode {
-  if (!isPayable(offer)) return null;
-  const p = state.payment;
-  if (p.offerId === offer.id && p.quote) return <span>total {p.quote.shippingCents ? `incl. ${formatCents(p.quote.shippingCents)} shipping` : "· free shipping"}</span>;
-  if (state.wallet.status === "ready" && state.wallet.last4) return <span>{state.wallet.brand ?? "Card"} •• {state.wallet.last4} · Stripe</span>;
-  return <span>Set up your wallet to buy here</span>;
+/** The line under the chips: Buy pays here with Stripe's test card. */
+function payNote(offer: Offer): ReactNode {
+  if (offer.priceCents === null) return null;
+  return <span>Buy here · {DEMO_CARD} · Stripe test</span>;
 }
+
+const DEMO_CARD = "Visa •• 4242";
+const PHONE_LINK = { sending: "Sending link to phone…", sent: "Link sent to phone", failed: "Link not sent", unpaired: "No phone paired" } as const;
 
 /** Card screens: the card, or (once Buy is pressed) where the payment is. */
 function CardScreen({ list, arriving, layout, secondary, snapshot, box }: { list: Offer[]; arriving: boolean; layout: CardLayout; secondary: "cart-add" | "cart-remove"; snapshot?: string | null; box?: NormalizedBox }) {
@@ -288,7 +288,7 @@ function CardScreen({ list, arriving, layout, secondary, snapshot, box }: { list
   if (payingFor(state, offer)) return <PaymentSurface offer={offer} />;
   return (
     <>
-      <OfferCard offers={list} offer={offer} arriving={arriving} layout={layout} snapshot={snapshot} box={box} note={payNote(state, offer)} />
+      <OfferCard offers={list} offer={offer} arriving={arriving} layout={layout} snapshot={snapshot} box={box} note={payNote(offer)} />
       <CardButtons secondary={secondary} single={list.length < 2} />
     </>
   );
@@ -490,7 +490,9 @@ function PaymentSurface({ offer }: { offer: Offer }) {
   const done = p.status === "confirmed" || p.status === "accepted";
   const problem = p.status === "needs-action" || p.status === "error" || p.status === "recovery";
   const title = p.status === "pending" ? "Paying…" : done ? "Done!" : p.status === "needs-action" ? "Quick check" : p.status === "recovery" ? "Price changed" : "Didn’t go through";
-  const line = done
+  const line = p.demo
+    ? (done ? `Paid with ${p.order?.cardSummary ?? DEMO_CARD} · Stripe test` : problem ? p.error ?? "The test card was declined." : `${DEMO_CARD} · Stripe test card`)
+    : done
     ? (p.status === "accepted" ? "Order accepted" : "Payment confirmed · waiting for the seller")
     : p.status === "needs-action" ? "Your bank wants to verify on your phone. Your order is saved."
     : problem ? p.error ?? "Your selection is kept." : `${offer.retailer} · Payments by Stripe`;
@@ -505,7 +507,7 @@ function PaymentSurface({ offer }: { offer: Offer }) {
         <p className="mt-1 text-[25px] text-white/60">{offer.retailer} · <span className="font-semibold text-white tabular-nums">{formatCents(total)}</span></p>
       </div>
       <p className="absolute right-11 bottom-[142px] left-11 line-clamp-2 text-center text-[22px] font-medium text-white/70" data-payment-status={p.status}>
-        {line}{done && p.order?.reference ? ` · Ref ${p.order.reference}` : ""}
+        {line}{done && p.order?.reference ? ` · Ref ${p.order.reference}` : ""}{done && p.phoneLink ? ` · ${PHONE_LINK[p.phoneLink]}` : ""}
       </p>
       <BottomRow>
         <Pill id="pay-wait" className="w-[300px]" />
@@ -1429,18 +1431,18 @@ function WalletTray() {
       </>
     );
   }
-  const checking = w.status === "unknown";
+  // No saved card: Buy uses Stripe's test card, right here on the glasses.
   return (
     <>
-      <Center>
-        {checking ? <Spinner /> : <Wallet className="size-[76px]" style={{ color: BLUE }} strokeWidth={1.6} aria-hidden />}
-        <p className={clsx("mt-6 text-[40px] leading-tight", HEADLINE)}>{w.status === "signed-out" ? "Set up your wallet" : w.status === "not-ready" ? "No saved card yet" : "Checking your wallet…"}</p>
-        <p className="mt-3 max-w-[480px] text-[24px] leading-snug text-white/60">One-time setup on your phone. Card details stay with Stripe.</p>
-      </Center>
-      <BottomRow>
-        <Pill id="w-setup" className="flex-[1.5]" icon={<Smartphone className="size-[28px]" aria-hidden />} />
-        <Pill id="w-refresh" className="flex-1" />
-      </BottomRow>
+      <div className="absolute top-[86px] right-11 left-11 flex items-center gap-5 rounded-[26px] bg-white/[0.07] px-6 py-5">
+        <span className="flex size-[64px] shrink-0 items-center justify-center rounded-[18px]" style={{ background: BLUE }} aria-hidden><Wallet className="size-[34px] text-[#0d1a2a]" strokeWidth={2.2} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[32px] leading-tight font-bold tabular-nums">{DEMO_CARD}</span>
+          <span className="block truncate text-[20px] text-white/55">Stripe test card · ready</span>
+        </span>
+      </div>
+      <p className="absolute top-[236px] right-11 left-11 text-[24px] leading-snug text-white/65">Buy pays here on your glasses with Stripe’s test card. No real money moves.</p>
+      <BottomRow><Pill id="w-done" className="w-[260px]" /></BottomRow>
     </>
   );
 }
