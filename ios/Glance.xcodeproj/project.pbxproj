@@ -10,7 +10,6 @@
 		0ACADE81F34FEBEA497D002C /* GlanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3EC93E54491A277DC1DF851 /* GlanceTests.swift */; };
 		1088E9F36132CCD23331605D /* GlanceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A50FBF6CBA27865990D68D3 /* GlanceApp.swift */; };
 		1B589C60454C1C6B07BB50A0 /* MWDATDisplay in Frameworks */ = {isa = PBXBuildFile; productRef = D9FB2FF46A9FFFC6DBB3B57E /* MWDATDisplay */; };
-		1BB584C29AD89F72CF13BC03 /* lens.css in Resources */ = {isa = PBXBuildFile; fileRef = 698581C1E37189048BC78FF2 /* lens.css */; };
 		456C066A5BF8C2282862A147 /* GlassesTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE679656A103319CBA970705 /* GlassesTransport.swift */; };
 		48A34E75C2D9A06E4A6F93B1 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ACDE36124B199FBD73EA6D2 /* Views.swift */; };
 		508804CD84F27A12CF0C0AA0 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3B1DA07CFDCE092F340CAD9C /* MWDATCore */; };
@@ -20,6 +19,7 @@
 		7C745B75C778A40DAB76C560 /* DATTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD38E557AC764640AC4D082A /* DATTransport.swift */; };
 		8F3719EBCB279B824649DE5C /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993FFBEEDF57F07532547183 /* RelayClient.swift */; };
 		93ADF0F7A5750B92F7292FCB /* native-lens.js in Resources */ = {isa = PBXBuildFile; fileRef = 6103973D575A9D6EF6D5C2DB /* native-lens.js */; };
+		B4D77D45555292979607899E /* lens.css in Resources */ = {isa = PBXBuildFile; fileRef = 9CA190312AB5AE5986DD5BEA /* lens.css */; };
 		B6840A9E78AA5972231843F3 /* LensBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30208B4FF58CE9AB1DA7338 /* LensBridge.swift */; };
 		B7D0536BB572326DAE8768C3 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 987FEF33821EDA710FBA8E98 /* MWDATCamera */; };
 /* End PBXBuildFile section */
@@ -48,8 +48,8 @@
 		5A50FBF6CBA27865990D68D3 /* GlanceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceApp.swift; sourceTree = "<group>"; };
 		5ACDE36124B199FBD73EA6D2 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
 		6103973D575A9D6EF6D5C2DB /* native-lens.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "native-lens.js"; sourceTree = "<group>"; };
-		698581C1E37189048BC78FF2 /* lens.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = lens.css; sourceTree = "<group>"; };
 		993FFBEEDF57F07532547183 /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		9CA190312AB5AE5986DD5BEA /* lens.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = lens.css; path = ../../../src/lens/lens.css; sourceTree = "<group>"; };
 		AD38E557AC764640AC4D082A /* DATTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DATTransport.swift; sourceTree = "<group>"; };
 		B30208B4FF58CE9AB1DA7338 /* LensBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensBridge.swift; sourceTree = "<group>"; };
 		CD0E6EAD1D8048C2008DC372 /* GlanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlanceUITests.swift; sourceTree = "<group>"; };
@@ -73,19 +73,10 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		114415D1B3857C96692A5BB3 /* lens */ = {
-			isa = PBXGroup;
-			children = (
-				698581C1E37189048BC78FF2 /* lens.css */,
-			);
-			path = lens;
-			sourceTree = "<group>";
-		};
 		1A7345DEDC89903C9907667A = {
 			isa = PBXGroup;
 			children = (
 				F770F9C5C342F99F4D4564C0 /* Glance */,
-				B92E7695B6685B687D9B84F3 /* Glance */,
 				897E7B5C0E3778F8AD681930 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -108,17 +99,10 @@
 			path = UITests;
 			sourceTree = "<group>";
 		};
-		96FB2FC3AF3957551C408054 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				114415D1B3857C96692A5BB3 /* lens */,
-			);
-			path = src;
-			sourceTree = "<group>";
-		};
 		96FBEE8CDE391BD7CDB73AA0 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				9CA190312AB5AE5986DD5BEA /* lens.css */,
 				6103973D575A9D6EF6D5C2DB /* native-lens.js */,
 			);
 			path = Resources;
@@ -144,15 +128,6 @@
 				5ACDE36124B199FBD73EA6D2 /* Views.swift */,
 			);
 			path = Sources;
-			sourceTree = "<group>";
-		};
-		B92E7695B6685B687D9B84F3 /* Glance */ = {
-			isa = PBXGroup;
-			children = (
-				96FB2FC3AF3957551C408054 /* src */,
-			);
-			name = Glance;
-			path = ..;
 			sourceTree = "<group>";
 		};
 		F770F9C5C342F99F4D4564C0 /* Glance */ = {
@@ -281,7 +256,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1BB584C29AD89F72CF13BC03 /* lens.css in Resources */,
+				B4D77D45555292979607899E /* lens.css in Resources */,
 				93ADF0F7A5750B92F7292FCB /* native-lens.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -437,7 +412,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -535,7 +510,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
