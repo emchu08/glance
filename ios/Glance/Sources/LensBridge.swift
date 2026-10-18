@@ -43,6 +43,8 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
         cfg.userContentController.add(self, name: "glance")
         cfg.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "glanceNative")
         cfg.allowsInlineMediaPlayback = true
+        // Glasses presses reach the page from native code, not as taps, so let the lens play its tones without one.
+        cfg.mediaTypesRequiringUserActionForPlayback = []
         if let path = Bundle.main.url(forResource: "native-lens", withExtension: "js"),
            let script = try? String(contentsOf: path, encoding: .utf8) {
             cfg.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
