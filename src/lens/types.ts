@@ -131,8 +131,6 @@ export interface PaymentState {
   error: string | null;
   attemptKey: string | null;
   originMode: Mode | null;
-  /** Paid on the glasses with Stripe's test card (no sign-in, no saved card). */
-  demo?: boolean;
 }
 
 export interface WalletState {
@@ -162,8 +160,6 @@ export interface HandoffState {
 }
 
 export interface LensState {
-  /** After anything is added to a cart, scans pause until this time (ms), so the same item doesn't pop straight back up. */
-  scanCooldownUntil?: number;
   mode: Mode;
   capture: CaptureKind;
   screen: Screen;
@@ -225,7 +221,6 @@ export type LensEvent =
   | { type: "grocery/frame"; observations: import("@/data/types").GroceryObservation[]; frameIndex: number }
   | { type: "grocery/add-held" }
   | { type: "grocery/add-manual"; productKey: string; label: string; packageSize: string | null; unitPriceCents: number | null; source: import("@/data/types").PriceSource }
-  | { type: "grocery/add-offer"; offer: Offer }
   | { type: "grocery/confirm-ask"; yes: boolean }
   | { type: "grocery/qty"; productKey: string; delta: 1 | -1 }
   | { type: "grocery/remove"; productKey: string }
@@ -271,7 +266,6 @@ export type LensEvent =
   | { type: "payment/submit"; attemptKey: string }
   | { type: "payment/status"; status: PaymentStatus; orderId?: string; order?: OrderSummary | null; error?: string }
   | { type: "payment/clear" }
-  | { type: "payment/demo-start"; offerId: string; originMode: Mode; attemptKey: string }
   // composer
   | { type: "composer/open"; field: string; value: string }
   | { type: "composer/type"; char: string }
@@ -297,7 +291,6 @@ export type LensEffect =
   | { kind: "open-url"; url: string }
   | { kind: "quote"; offerId: string }
   | { kind: "purchase"; offerId: string }
-  | { kind: "demo-purchase"; offerId: string; attemptKey: string }
   | { kind: "retry-purchase" }
   | { kind: "wallet-refresh" }
   | { kind: "wallet-pause-rule"; pause: boolean }

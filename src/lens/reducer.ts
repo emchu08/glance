@@ -36,12 +36,6 @@ function root(state: LensState, mode: Mode = state.mode): LensState {
   return { ...state, mode, stack: [], screen: { id: ROOT_SCREEN[mode] }, focusId: null, windowStart: 0, revision: state.revision + 1 };
 }
 
-/** Scans pause this long after anything is added to a cart. */
-export const SCAN_COOLDOWN_MS = 2_000;
-const cooled = (state: LensState): LensState => ({ ...state, scanCooldownUntil: Date.now() + SCAN_COOLDOWN_MS });
-/** A grocery cart line for an online listing. */
-export const onlineLineKey = (offerId: string) => `online:${offerId}`;
-
 function bump(state: LensState): LensState {
   return { ...state, revision: state.revision + 1 };
 }
@@ -192,7 +186,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       const exists = state.glimpse.saved.some((o) => o.id === event.offer.id);
       if (exists) return state; // activating an already-saved item opens the cart (handled by action)
       const candidateLabel = state.glimpse.candidates.find((c) => c.id === event.offer.candidateId)?.label ?? event.offer.name;
-      return bump({ ...cooled(state), glimpse: { ...state.glimpse, saved: [...state.glimpse.saved, { ...event.offer, savedAt: Date.now(), candidateLabel }] }, toast: { text: "Added to cart", at: Date.now() } });
+      return bump({ ...state, glimpse: { ...state.glimpse, saved: [...state.glimpse.saved, { ...event.offer, savedAt: Date.now(), candidateLabel }] }, toast: { text: "Saved", at: Date.now() } });
     }
     case "glimpse/remove-saved": {
       const saved = state.glimpse.saved.filter((o) => o.id !== event.offerId);
@@ -215,7 +209,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       let screen = state.screen;
       let stack = state.stack;
       let toast = state.toast;
-      let cooldown = state.scanCooldownUntil;
       for (const e of events) {
         if (e.type === "add") {
           const product = CATALOG_BY_ID[e.productKey];
@@ -225,7 +218,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
             grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: e.productKey, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
             list = completeListFromCart(list, cart);
             toast = { text: `Added ${e.label}`, at: Date.now() };
-            cooldown = Date.now() + SCAN_COOLDOWN_MS;
             // The camera confirmed the placement: the held-item card returns to the cart.
             if (screen.id === "grocery-item" && screen.params?.productKey === e.productKey) {
               screen = { id: "grocery" };
@@ -251,50 +243,35 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
           }
         }
       }
-      return { ...state, grocery, list, screen, stack, toast, scanCooldownUntil: cooldown, focusId: screen === state.screen ? state.focusId : null, revision: state.revision + 1 };
+      return { ...state, grocery, list, screen, stack, toast, focusId: screen === state.screen ? state.focusId : null, revision: state.revision + 1 };
     }
     case "grocery/add-held": {
-      // The item on the card is what's added (the camera may since have seen another one held).
-      const shown = state.screen.id === "grocery-item" ? (state.screen.params?.productKey as string | undefined) : undefined;
       const held = currentlyHeld(state.grocery.tracker);
-      const key = shown ?? held?.productKey ?? state.grocery.heldKey;
+      const key = held?.productKey ?? state.grocery.heldKey ?? (state.screen.params?.productKey as string | undefined);
       if (!key) return state;
-      const heldNow = held?.productKey === key ? held : null;
-      const isHeldKey = state.grocery.heldKey === key;
-      const track = state.grocery.tracker.tracks[key];
-      const eventId = track && track.episode > 0 ? `${key}#${track.episode}` : `${key}#manual-${Date.now()}`;
-      // "Already in your cart" only when the cart itself has this hold, not when the camera merely asked about it.
-      const already = !!state.grocery.cart.find((l) => l.productKey === key)?.events.includes(eventId);
-      const { state: tracker } = claimHold(state.grocery.tracker, key);
-      const label = heldNow?.label ?? (isHeldKey ? state.grocery.heldLabel : null) ?? CATALOG_BY_ID[key]?.name ?? track?.label ?? key;
-      const size = heldNow?.packageSize ?? (isHeldKey ? state.grocery.heldSize : null) ?? CATALOG_BY_ID[key]?.size ?? null;
-      const pendingAsk = state.grocery.pendingAsk?.productKey === key ? null : state.grocery.pendingAsk;
-      let grocery = { ...state.grocery, tracker, pendingAsk, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
-      if (already) {
+      const { state: tracker, alreadyCounted } = claimHold(state.grocery.tracker, key);
+      const label = held?.label ?? state.grocery.heldLabel ?? CATALOG_BY_ID[key]?.name ?? key;
+      const size = held?.packageSize ?? state.grocery.heldSize ?? CATALOG_BY_ID[key]?.size ?? null;
+      let grocery = { ...state.grocery, tracker, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
+      if (alreadyCounted) {
         grocery = { ...grocery, acknowledgement: "Already in your cart" };
       } else {
+        const t = tracker.tracks[key];
+        const eventId = t ? `${key}#${t.episode}` : `${key}#manual-${Date.now()}`;
         const product = CATALOG_BY_ID[key];
-        const shelf = heldNow?.priceCents ?? (isHeldKey && state.grocery.heldPrice?.source === "shelf-label" ? state.grocery.heldPrice.cents : null);
-        const price = shelf ?? product?.qfcPriceCents ?? null;
-        const cart = addToCart(grocery.cart, { productKey: key, label, packageSize: size, unitPriceCents: price, priceSource: shelf ? "shelf-label" : product ? "catalog" : "unknown", eventId });
+        const price = held?.priceCents ?? product?.qfcPriceCents ?? null;
+        const cart = addToCart(grocery.cart, { productKey: key, label, packageSize: size, unitPriceCents: price, priceSource: held?.priceCents ? "shelf-label" : product ? "catalog" : "unknown", eventId });
         grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: key, acknowledgement: `Added ${label}` };
       }
       const list = completeListFromCart(state.list, grocery.cart);
       // Add on the held-item card returns immediately to the grocery cart.
-      return { ...root({ ...cooled(state), grocery, list }, "grocery") };
-    }
-    case "grocery/add-offer": {
-      // An online listing added from Grocery is a line in the grocery cart, at the listing's price.
-      const productKey = onlineLineKey(event.offer.id);
-      if (state.grocery.cart.some((l) => l.productKey === productKey)) return state;
-      const cart = addToCart(state.grocery.cart, { productKey, label: event.offer.name, packageSize: null, unitPriceCents: event.offer.priceCents, priceSource: "online", eventId: `${productKey}#${Date.now()}` });
-      return bump({ ...cooled(state), grocery: { ...state.grocery, undo: [state.grocery.cart, ...state.grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: productKey }, toast: { text: "Added to cart", at: Date.now() } });
+      return { ...root({ ...state, grocery, list }, "grocery") };
     }
     case "grocery/add-manual": {
       const eventId = `${event.productKey}#manual-${Date.now()}`;
       const cart = addToCart(state.grocery.cart, { productKey: event.productKey, label: event.label, packageSize: event.packageSize, unitPriceCents: event.unitPriceCents, priceSource: event.source, eventId });
       const grocery = { ...state.grocery, undo: [state.grocery.cart, ...state.grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: event.productKey, acknowledgement: `Added ${event.label}`, manualText: "" };
-      return root({ ...cooled(state), grocery, list: completeListFromCart(state.list, cart) }, "grocery");
+      return root({ ...state, grocery, list: completeListFromCart(state.list, cart) }, "grocery");
     }
     case "grocery/confirm-ask": {
       const ask = state.grocery.pendingAsk;
@@ -307,7 +284,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
         grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: ask.productKey };
         list = completeListFromCart(list, cart);
       }
-      return bump({ ...(event.yes ? cooled(state) : state), grocery, list });
+      return bump({ ...state, grocery, list });
     }
     case "grocery/qty": {
       const line = state.grocery.cart.find((l) => l.productKey === event.productKey);
@@ -451,9 +428,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       return bump({ ...state, payment: { ...state.payment, status: "pending", attemptKey: event.attemptKey, error: null } });
     case "payment/status":
       return bump({ ...state, payment: { ...state.payment, status: event.status, orderId: event.orderId ?? state.payment.orderId, order: event.order === undefined ? state.payment.order : event.order, error: event.error ?? null } });
-    case "payment/demo-start":
-      if (state.payment.status === "pending") return state; // prevents repeated submission
-      return bump({ ...state, payment: { status: "pending", offerId: event.offerId, quote: null, orderId: null, order: null, error: null, attemptKey: event.attemptKey, originMode: event.originMode, demo: true } });
     case "payment/clear": {
       const originMode = state.payment.originMode ?? state.mode;
       const cleared = { ...state, payment: { ...emptyLens().payment } };

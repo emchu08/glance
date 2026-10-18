@@ -38,7 +38,7 @@ const post = async (path, body) => {
     assert.equal((await upload()).status, 200);
     const status = await (await fetch(`${base}/api/relay/status?code=${code}`)).json();
     assert.equal(status.lens, true, 'Phone can see that Glance is open on the glasses');
-    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera ready'), null, { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera live'), null, { timeout: 10000 });
 
     // A scan uses a frame from the phone, newer than the last one used.
     await page.locator('[data-action-id="mode-glimpse"]').click();
@@ -53,7 +53,7 @@ const post = async (path, body) => {
     await page.waitForSelector('[data-screen="picker"]');
     const keepAlive = setInterval(() => { upload().catch(() => {}); }, 1000);
     try {
-      await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera ready'), null, { timeout: 15000 });
+      await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Glasses camera live'), null, { timeout: 15000 });
     } finally { clearInterval(keepAlive); }
     assert.deepEqual(errors, []);
     console.log(`PASS: glasses web app claimed ${code}, phone joined and uploaded, presence both ways, scan used the relayed frame, relaunch without the code still pairs, no browser errors.`);

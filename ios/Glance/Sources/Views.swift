@@ -1,8 +1,8 @@
 import SwiftUI
 import WebKit
 
-/// The phone half of Glance: connects the glasses on launch and draws the Glance screens on them. Their
-/// camera turns on only while a scan wants pictures. The phone shows the same Glance screens, or the camera.
+/// The phone half of Glance: connects the glasses on launch, draws the Glance screens on them and
+/// streams their camera for scanning. The phone shows either that camera or the same Glance screens.
 struct LauncherView: View {
     @Environment(AppModel.self) private var model
     private let blue = Color(red: 0.16, green: 0.39, blue: 0.91)
@@ -70,7 +70,7 @@ private struct ConnectionLine: View {
         HStack(spacing: 8) {
             if model.isLaunching { ProgressView().controlSize(.small) }
             Label(model.cameraLive ? "Glasses connected · camera on"
-                  : !model.isLaunching && !model.cameraStatus.isEmpty && model.errorMessage == nil ? "Glasses connected · camera \(model.cameraStatus)"
+                  : !model.isLaunching && !model.cameraStatus.isEmpty && model.errorMessage == nil ? "Glasses camera: \(model.cameraStatus)"
                   : model.launchStatus,
                   systemImage: model.cameraLive ? "eyeglasses" : "antenna.radiowaves.left.and.right")
         }
@@ -89,7 +89,7 @@ private struct CameraPreview: View {
                 if let image = model.cameraPreview, model.cameraLive {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
-                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Connecting the glasses…" : "Glasses camera off") : "Camera \(model.cameraStatus)", systemImage: "video.slash")
+                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Starting the glasses camera…" : "Glasses camera off") : "Camera: \(model.cameraStatus)", systemImage: "video.slash")
                         .font(.callout).foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center).padding()
                 }
@@ -104,8 +104,7 @@ private struct ConnectionCard: View {
     @Environment(AppModel.self) private var model
     let blue: Color
     var body: some View {
-        // The camera is off between scans; that's normal once it's ready.
-        if model.errorMessage != nil || (!model.cameraLive && !model.cameraReady && !model.isLaunching) {
+        if model.errorMessage != nil || (!model.cameraLive && !model.isLaunching) {
             VStack(alignment: .leading, spacing: 10) {
                 if let error = model.errorMessage {
                     Text(error).font(.callout).accessibilityIdentifier("connection-error")
