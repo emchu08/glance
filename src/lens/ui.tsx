@@ -49,7 +49,12 @@ export function FocusRing({ className }: { className?: string }) {
 /**
  * Pointer-down focuses, which can move the control (the mode wheel turns, lists glide). If it
  * has moved out from under the pointer by release, no click will reach it, so the press
- * completes on release instead. Otherwise it's an ordinary click (the phone app listens for those).
+ * completes on release instead. Otherwise it's an ordinary click.
+ *
+ * Touch always completes on release: a touch stays captured by the control it started on, so
+ * release can't tell that the control moved, and iOS sends the click to whatever slid under the
+ * finger since (on the phone app, tapping Grocery on the mode wheel opened Gourmet). Any click
+ * just after a press finished here is that stray click, whichever control it lands on.
  */
 let lastPress: { id: string; at: number } | null = null;
 
@@ -73,15 +78,21 @@ export function Act({ id, className, children, label, style }: { id: string; cla
           if (e.button !== 0) return;
           focus(id);
           const el = e.currentTarget;
-          // Still under the pointer on release: the click follows as usual. Moved away: finish here.
+          const touch = e.pointerType !== "mouse";
+          const press = new AbortController();
+          // Mouse still over the control on release: the click follows as usual. Touch, or moved away: finish here.
           window.addEventListener("pointerup", (up) => {
-            if (up.target instanceof Node && el.contains(up.target)) return;
+            if (up.pointerId !== e.pointerId) return;
+            press.abort();
+            if (!touch && up.target instanceof Node && el.contains(up.target)) return;
             lastPress = { id, at: Date.now() };
             activate(id);
-          }, { once: true });
+          }, { signal: press.signal });
+          // A cancelled touch (the page scrolled instead) presses nothing.
+          window.addEventListener("pointercancel", (c) => { if (c.pointerId === e.pointerId) press.abort(); }, { signal: press.signal });
         },
         onClick: () => {
-          if (lastPress?.id === id && Date.now() - lastPress.at < 800) return;
+          if (lastPress && Date.now() - lastPress.at < 800) return;
           activate(id);
         },
       })}
