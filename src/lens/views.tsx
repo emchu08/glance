@@ -15,6 +15,7 @@ import { storesByDistance } from "@/domain/grocery/stores";
 import { formatAmounts, paginateSteps, scaleIngredients } from "@/domain/gourmet/list";
 import { formatCents } from "@/domain/money";
 import { useLens } from "./LensProvider";
+import { groceryCardPrice } from "./groceryPrice";
 import { compareOffers, currentOffer, groceryOnline, isPayable, payingFor } from "./screens";
 import type { LensState } from "./types";
 import {
@@ -549,6 +550,7 @@ function lineNote(l: { priceSource: string; packageSize: string | null }) {
   if (l.priceSource === "shelf-label") return "From shelf label";
   if (l.priceSource === "manual") return "Entered";
   if (l.priceSource === "online") return `Online price${l.packageSize ? ` · ${l.packageSize}` : ""}`;
+  if (l.priceSource === "estimate") return `Typical price${l.packageSize ? ` · ${l.packageSize}` : ""}`;
   return l.packageSize ?? "";
 }
 
@@ -560,7 +562,7 @@ function GroceryCart() {
   const pending = gr.pendingAsk;
   const listTop = pending ? 348 : 268;
   const openList = state.list.filter((i) => !i.done).length;
-  const estimated = t.unknownLines > 0 || gr.cart.some((l) => l.priceSource === "shelf-label" || l.priceSource === "online");
+  const estimated = t.unknownLines > 0 || gr.cart.some((l) => l.priceSource === "shelf-label" || l.priceSource === "online" || l.priceSource === "estimate");
 
   return (
     <>
@@ -649,7 +651,6 @@ function GroceryItem() {
   const isHeld = state.grocery.heldKey === key;
   const name = product?.name ?? (isHeld ? state.grocery.heldLabel : null) ?? key;
   const size = product?.size ?? (isHeld ? state.grocery.heldSize : null);
-  const held = isHeld ? state.grocery.heldPrice ?? null : null;
   const inCart = state.grocery.cart.find((l) => l.productKey === key);
   const sample = state.capture === "sample";
 
@@ -658,13 +659,8 @@ function GroceryItem() {
   const here = insight?.homePriceCents ?? product?.qfcPriceCents ?? null;
   const live = groceryOnline(state, key);
   const online = live?.offers.filter((o) => o.priceCents !== null) ?? [];
-  const price: { cents: number; note: string; approx?: boolean } | null =
-    !sample && held?.source === "shelf-label" ? { cents: held.cents, note: "shelf label" }
-    : sample && here !== null ? { cents: here, note: `${HOME_STORE} · sample` }
-    : online[0] ? { cents: online[0].priceCents!, note: `online · ${online[0].retailer}` }
-    : held ? { cents: held.cents, note: held.source === "estimate" ? "typical price" : "shelf label · est.", approx: held.source === "estimate" }
-    : here !== null ? { cents: here, note: HOME_STORE }
-    : null;
+  // The same price Add puts in the cart.
+  const price = groceryCardPrice(state, key);
   // A two-line nudge takes the third comparison row's space (the full list is on Compare).
   const rowLimit = insight?.nudge ? 2 : 3;
   const same = sample ? compareOffers(state, key).filter((c) => c.match === "same") : [];

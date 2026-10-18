@@ -82,6 +82,60 @@ test("adding starts a 2 s scan cooldown, so the item just added doesn't pop stra
   assert.equal(scanCoolingDown(s, Date.now()), true, "any add to cart");
 });
 
+const water = (state: "held" | "in_cart" | "on_shelf") =>
+  [{ productKey: "arrowhead-spring-water", label: "Arrowhead spring water", state, confidence: 0.95, packageSize: "24 pk", priceCents: null, estimatedPriceCents: 599 }];
+const liveGrocery = () => lensReducer(lensReducer(groceryAt(), { type: "capture/set", capture: "native" }), { type: "mode/set", mode: "grocery" });
+const frame = (s: LensState, obs: ReturnType<typeof water>) => lensReducer(s, { type: "grocery/frame", observations: obs, frameIndex: s.grocery.frameIndex + 1 });
+const offer = (priceCents: number) => ({ id: `https://shop.example/w${priceCents}`, name: "Arrowhead 24 pk", retailer: "Target", url: "https://shop.example/w", imageUrl: null, priceCents, match: "exact" as const, kind: "external_link" as const, origin: "live" as const });
+
+test("Add puts the price the card shows into the cart, for items outside the catalog too", () => {
+  // Only the camera's typical price is known: the cart gets it, marked as an estimate.
+  let s = frame(liveGrocery(), water("held"));
+  assert.equal(s.screen.id, "grocery-item");
+  s = lensReducer(s, { type: "grocery/add-held" });
+  let line = s.grocery.cart.find((l) => l.productKey === "arrowhead-spring-water");
+  assert.equal(line?.unitPriceCents, 599);
+  assert.equal(line?.priceSource, "estimate");
+  // An online price that arrives afterwards replaces the estimate.
+  s = lensReducer(s, { type: "grocery/online", productKey: "arrowhead-spring-water", status: "ready", offers: [offer(749), offer(679)] });
+  line = s.grocery.cart.find((l) => l.productKey === "arrowhead-spring-water");
+  assert.equal(line?.unitPriceCents, 679);
+  assert.equal(line?.priceSource, "online");
+
+  // Online prices already on the card: Add uses the one shown.
+  let t = frame(liveGrocery(), water("held"));
+  t = lensReducer(t, { type: "grocery/online", productKey: "arrowhead-spring-water", status: "ready", offers: [offer(649)] });
+  t = lensReducer(t, { type: "grocery/add-held" });
+  assert.equal(t.grocery.cart[0]?.unitPriceCents, 649);
+});
+
+test("holding an added item up for a long time never asks to add it again", () => {
+  let s = frame(liveGrocery(), water("held"));
+  s = lensReducer(s, { type: "grocery/add-held" });
+  for (let i = 0; i < 10; i += 1) {
+    s = frame(s, water("held"));
+    assert.equal(s.screen.id, "grocery", "no new card while it's still in hand");
+  }
+  // One frame where the camera misreads it as on the shelf isn't a put-down.
+  s = frame(frame(frame(s, water("on_shelf")), water("held")), water("held"));
+  assert.equal(s.screen.id, "grocery");
+  assert.equal(units(s, "arrowhead-spring-water"), 1);
+  // Put down for two frames, then picked up again: that's another one.
+  s = frame(frame(s, water("in_cart")), water("in_cart"));
+  s = frame(s, water("held"));
+  assert.equal(s.screen.id, "grocery-item", "a new pick-up opens the card");
+  s = lensReducer(s, { type: "grocery/add-held" });
+  assert.equal(units(s, "arrowhead-spring-water"), 2);
+
+  // Camera-confirmed adds behave the same.
+  let c = frame(frame(liveGrocery(), water("held")), water("in_cart"));
+  assert.equal(units(c, "arrowhead-spring-water"), 1);
+  c = lensReducer(c, { type: "nav/back" });
+  for (let i = 0; i < 5; i += 1) c = frame(c, water("held"));
+  assert.equal(c.screen.id, "grocery");
+  assert.equal(units(c, "arrowhead-spring-water"), 1);
+});
+
 test("Add to cart from online listings: Grocery's cart in Grocery, the shopping cart elsewhere", () => {
   const offer = { id: "https://shop.example/oat", name: "Oat milk 64 oz", retailer: "Shop", url: "https://shop.example/oat", imageUrl: null, priceCents: 449, match: "exact" as const, kind: "external_link" as const, origin: "live" as const };
   let s = groceryAt();

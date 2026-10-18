@@ -1,10 +1,11 @@
-import type { CartLine, Mode, Offer, ShoppingListItem } from "@/data/types";
+import type { CartLine, Mode, Offer, PriceSource, ShoppingListItem } from "@/data/types";
 import { addToCart, cartTotals, removeLine, setManualPrice, setQuantity } from "@/domain/grocery/cart";
 import { buildTripSummary } from "@/domain/grocery/exit";
 import { completeListFromCart } from "@/domain/grocery/list";
 import { claimHold, currentlyHeld, stepTracker } from "@/domain/grocery/tracker";
 import { CATALOG_BY_ID } from "@/data/grocery";
 import { additionSignature, addIngredientsToList, scaleIngredients } from "@/domain/gourmet/list";
+import { groceryCardPrice } from "./groceryPrice";
 import { initialState as emptyLens } from "./initial";
 import { ROOT_SCREEN, type LensEvent, type LensState, type Screen } from "./types";
 
@@ -38,6 +39,12 @@ function root(state: LensState, mode: Mode = state.mode): LensState {
 
 /** Scans pause this long after anything is added to a cart. */
 export const SCAN_COOLDOWN_MS = 2_000;
+
+/** What a grocery add costs: the price the item's card shows, so the cart matches what you saw. */
+function cartPrice(state: LensState, grocery: LensState["grocery"], key: string): { unitPriceCents: number | null; priceSource: PriceSource } {
+  const p = groceryCardPrice({ ...state, grocery }, key);
+  return p ? { unitPriceCents: p.cents, priceSource: p.source } : { unitPriceCents: null, priceSource: "unknown" };
+}
 const cooled = (state: LensState): LensState => ({ ...state, scanCooldownUntil: Date.now() + SCAN_COOLDOWN_MS });
 /** A grocery cart line for an online listing. */
 export const onlineLineKey = (offerId: string) => `online:${offerId}`;
@@ -218,9 +225,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       let cooldown = state.scanCooldownUntil;
       for (const e of events) {
         if (e.type === "add") {
-          const product = CATALOG_BY_ID[e.productKey];
-          const price = e.priceCents ?? product?.qfcPriceCents ?? null;
-          const cart = addToCart(grocery.cart, { productKey: e.productKey, label: e.label, packageSize: e.packageSize, unitPriceCents: price, priceSource: e.priceCents ? "shelf-label" : product ? "catalog" : "unknown", eventId: e.eventId });
+          const cart = addToCart(grocery.cart, { productKey: e.productKey, label: e.label, packageSize: e.packageSize, ...cartPrice(state, grocery, e.productKey), eventId: e.eventId });
           if (cart !== grocery.cart) {
             grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: e.productKey, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
             list = completeListFromCart(list, cart);
@@ -273,10 +278,8 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       if (already) {
         grocery = { ...grocery, acknowledgement: "Already in your cart" };
       } else {
-        const product = CATALOG_BY_ID[key];
-        const shelf = heldNow?.priceCents ?? (isHeldKey && state.grocery.heldPrice?.source === "shelf-label" ? state.grocery.heldPrice.cents : null);
-        const price = shelf ?? product?.qfcPriceCents ?? null;
-        const cart = addToCart(grocery.cart, { productKey: key, label, packageSize: size, unitPriceCents: price, priceSource: shelf ? "shelf-label" : product ? "catalog" : "unknown", eventId });
+        // The price on the card (computed before the held item is cleared).
+        const cart = addToCart(grocery.cart, { productKey: key, label, packageSize: size, ...cartPrice(state, state.grocery, key), eventId });
         grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: key, acknowledgement: `Added ${label}` };
       }
       const list = completeListFromCart(state.list, grocery.cart);
@@ -302,8 +305,8 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       let grocery = { ...state.grocery, pendingAsk: null };
       let list = state.list;
       if (event.yes) {
-        const product = CATALOG_BY_ID[ask.productKey];
-        const cart = addToCart(grocery.cart, { productKey: ask.productKey, label: ask.label, packageSize: ask.packageSize, unitPriceCents: ask.priceCents ?? product?.qfcPriceCents ?? null, priceSource: ask.priceCents ? "shelf-label" : product ? "catalog" : "unknown", eventId: ask.eventId });
+        const price = ask.priceCents !== null ? { unitPriceCents: ask.priceCents, priceSource: "shelf-label" as const } : cartPrice(state, grocery, ask.productKey);
+        const cart = addToCart(grocery.cart, { productKey: ask.productKey, label: ask.label, packageSize: ask.packageSize, ...price, eventId: ask.eventId });
         grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: ask.productKey };
         list = completeListFromCart(list, cart);
       }
@@ -332,8 +335,12 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       if (current && current.status === event.status && event.data === undefined) return state;
       return bump({ ...state, grocery: { ...state.grocery, insights: { ...state.grocery.insights, [event.productKey]: { status: event.status, data: event.data ?? current?.data ?? null } }, nudgedKeys: state.grocery.nudgedKeys.includes(event.productKey) ? state.grocery.nudgedKeys : [...state.grocery.nudgedKeys, event.productKey] } });
     }
-    case "grocery/online":
-      return bump({ ...state, grocery: { ...state.grocery, online: { ...state.grocery.online, [event.productKey]: { status: event.status, offers: event.offers } } } });
+    case "grocery/online": {
+      // Prices that arrive after the add fill in a cart line that had none (or only a typical price).
+      const cheapest = event.offers.reduce<number | null>((m, o) => (o.priceCents !== null && (m === null || o.priceCents < m) ? o.priceCents : m), null);
+      const cart = cheapest === null || state.capture === "sample" ? state.grocery.cart : state.grocery.cart.map((l) => (l.productKey === event.productKey && (l.priceSource === "unknown" || l.priceSource === "estimate") ? { ...l, unitPriceCents: cheapest, priceSource: "online" as const } : l));
+      return bump({ ...state, grocery: { ...state.grocery, cart, online: { ...state.grocery.online, [event.productKey]: { status: event.status, offers: event.offers } } } });
+    }
     case "grocery/finish": {
       if (state.grocery.cart.length === 0) return state;
       const summary = buildTripSummary(state.grocery.cart, state.grocery.bought.reduce((s, b) => s + b.priceCents, 0));

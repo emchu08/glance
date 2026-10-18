@@ -5,8 +5,11 @@ import { aisleStops } from "@/domain/grocery/list";
 import { storesByDistance, walkingDirectionsUrl } from "@/domain/grocery/stores";
 import { paginateSteps, scaleIngredients } from "@/domain/gourmet/list";
 import { formatCents } from "@/domain/money";
+import { groceryOnline } from "./groceryPrice";
 import { onlineLineKey } from "./reducer";
 import { MODE_META, type LensAction, type LensState, type Mode, type Screen } from "./types";
+
+export { groceryOnline };
 
 /**
  * Pure screen description: every focusable control on the current screen as an
@@ -183,13 +186,6 @@ export function compareOffers(state: LensState, productKey: string) {
 }
 
 /** Live online prices for a grocery item (from the listing search), cheapest priced first. */
-export function groceryOnline(state: LensState, productKey: string) {
-  if (state.capture === "sample") return null;
-  const entry = state.grocery.online?.[productKey];
-  if (!entry) return { status: "loading" as const, offers: [] as Offer[] };
-  return { status: entry.status, offers: [...entry.offers].sort((a, b) => (a.priceCents ?? Infinity) - (b.priceCents ?? Infinity)) };
-}
-
 export function describeScreen(state: LensState): LensAction[] {
   if (state.composer) return describeComposer(state);
   const s = state.screen;
@@ -332,7 +328,7 @@ export function describeScreen(state: LensState): LensAction[] {
       const key = String(s.params?.productKey ?? "");
       const line = state.grocery.cart.find((l) => l.productKey === key);
       if (!line) return [...h, act("done", "Done", 0, 0.5, [{ type: "nav/back" }], { variant: "primary" })];
-      const priced = line.priceSource !== "unknown" && line.priceSource !== "shelf-label";
+      const priced = line.priceSource !== "unknown" && line.priceSource !== "shelf-label" && line.priceSource !== "estimate";
       return [...h,
         act("done", "Done", priced ? 1 : 2, 0.7, [{ type: "nav/back" }], { variant: "primary" }),
         act("qty-minus", "Fewer", 0, 0.3, [{ type: "grocery/qty", productKey: key, delta: -1 }]),

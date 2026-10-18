@@ -7,11 +7,14 @@ import type { GroceryObservation, ObservationState } from "@/data/types";
  *  - in_cart ≥ 0.75 confirms automatically; weaker usable evidence asks once.
  *  - Held/placing item absent for three frames → put back.
  *  - Event ids are `productKey#episode`; repeated frames cannot re-add the same unit.
+ *  - After an add (or the ask), the item only counts as picked up again once it has been out of
+ *    hand for REARM_FRAMES frames in a row, so holding it up for a long time never re-prompts.
  */
 
 export const MIN_EVIDENCE = 0.5;
 export const AUTO_CONFIRM = 0.75;
 export const ABSENT_FRAMES_PUT_BACK = 3;
+export const REARM_FRAMES = 2;
 
 export interface Track {
   productKey: string;
@@ -25,6 +28,8 @@ export interface Track {
   lastConfidence: number;
   /** Set when a manual Add claimed the current hold so camera evidence cannot double-add. */
   claimedByManual: boolean;
+  /** Frames in a row the item has been out of hand since its add (see REARM_FRAMES). */
+  outOfHandFrames?: number;
 }
 
 export interface TrackerState {
@@ -53,13 +58,13 @@ export function stepTracker(state: TrackerState, observations: GroceryObservatio
     seen.add(obs.productKey);
     const prev = tracks[obs.productKey];
     const track: Track = prev
-      ? { ...prev, absentFrames: 0, lastState: obs.state, lastConfidence: obs.confidence, label: obs.label, packageSize: obs.packageSize ?? prev.packageSize, priceCents: obs.priceCents ?? prev.priceCents }
-      : { productKey: obs.productKey, label: obs.label, packageSize: obs.packageSize, priceCents: obs.priceCents, episode: 0, phase: "idle", absentFrames: 0, lastState: obs.state, lastConfidence: obs.confidence, claimedByManual: false };
+      ? { ...prev, absentFrames: 0, outOfHandFrames: obs.state === "held" || obs.state === "placing" ? 0 : (prev.outOfHandFrames ?? 0) + 1, lastState: obs.state, lastConfidence: obs.confidence, label: obs.label, packageSize: obs.packageSize ?? prev.packageSize, priceCents: obs.priceCents ?? prev.priceCents }
+      : { productKey: obs.productKey, label: obs.label, packageSize: obs.packageSize, priceCents: obs.priceCents, episode: 0, phase: "idle", absentFrames: 0, lastState: obs.state, lastConfidence: obs.confidence, claimedByManual: false, outOfHandFrames: 0 };
+    rearm(track);
 
     switch (obs.state) {
       case "on_shelf":
-        // Seeing never adds. If a finished episode's item is back on the shelf, go idle.
-        if (track.phase === "added" || track.phase === "pending-confirm") track.phase = "idle";
+        // Seeing never adds. A finished episode's item goes idle once it has stayed out of hand (rearm).
         break;
       case "held":
         if (track.phase === "idle") {
@@ -98,7 +103,8 @@ export function stepTracker(state: TrackerState, observations: GroceryObservatio
 
   for (const key of Object.keys(tracks)) {
     if (seen.has(key)) continue;
-    const t = { ...tracks[key], absentFrames: tracks[key].absentFrames + 1 };
+    const t = { ...tracks[key], absentFrames: tracks[key].absentFrames + 1, outOfHandFrames: (tracks[key].outOfHandFrames ?? 0) + 1 };
+    rearm(t);
     if ((t.phase === "held" || t.phase === "placing") && t.absentFrames >= ABSENT_FRAMES_PUT_BACK) {
       t.phase = "idle";
       events.push({ type: "put-back", productKey: t.productKey, label: t.label });
@@ -109,17 +115,22 @@ export function stepTracker(state: TrackerState, observations: GroceryObservatio
   return { state: { frame: state.frame + 1, tracks, emitted }, events };
 }
 
+/** A finished episode's item can be picked up again (a new unit) once it has stayed out of hand. */
+function rearm(t: Track) {
+  if ((t.phase === "added" || t.phase === "pending-confirm") && (t.outOfHandFrames ?? 0) >= REARM_FRAMES) t.phase = "idle";
+}
+
 /** Manual Add on a held item: claims the current hold so later camera evidence does not double-add. */
 export function claimHold(state: TrackerState, productKey: string): { state: TrackerState; alreadyCounted: boolean } {
   const t = state.tracks[productKey];
   if (!t) return { state, alreadyCounted: false };
   const eventId = `${t.productKey}#${t.episode}`;
   const alreadyCounted = state.emitted.includes(eventId) && (t.phase === "added" || t.phase === "pending-confirm");
-  if (alreadyCounted) return { state, alreadyCounted: true };
   const emitted = state.emitted.includes(eventId) ? state.emitted : [...state.emitted, eventId];
   return {
-    state: { ...state, emitted, tracks: { ...state.tracks, [productKey]: { ...t, claimedByManual: true, phase: t.phase === "idle" ? "idle" : "added" } } },
-    alreadyCounted: false,
+    // Whatever the camera thought, this unit is now in the cart: it can't prompt again until put down.
+    state: { ...state, emitted, tracks: { ...state.tracks, [productKey]: { ...t, claimedByManual: true, phase: "added", outOfHandFrames: 0 } } },
+    alreadyCounted,
   };
 }
 

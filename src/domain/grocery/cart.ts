@@ -11,7 +11,7 @@ export interface AddLineInput {
   confirmed?: boolean;
 }
 
-const PRICE_PRECEDENCE: Record<PriceSource, number> = { manual: 5, "shelf-label": 4, catalog: 3, online: 2, unknown: 0 };
+const PRICE_PRECEDENCE: Record<PriceSource, number> = { manual: 5, "shelf-label": 4, catalog: 3, online: 2, estimate: 1, unknown: 0 };
 
 export function addToCart(lines: CartLine[], input: AddLineInput): CartLine[] {
   const idx = lines.findIndex((l) => l.productKey === input.productKey);

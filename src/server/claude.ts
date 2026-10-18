@@ -100,7 +100,7 @@ export async function recognizeGroceryFrame(image: string, cartLabels: string[])
     model: MODEL(),
     max_tokens: 1500,
     system: `You observe one grocery frame at a time for a shopping tracker. Report at most five prominent items with their state in THIS frame only. Do not decide whether an item was newly added; the tracker owns that. Copy a readable shelf price exactly or return null; separately give a typical US price estimate for held items. ${SAFETY}`,
-    messages: [{ role: "user", content: [imageBlock(image), { type: "text", text: `Already-confirmed cart labels (context only): ${cartLabels.join(", ") || "none"}. Describe visible grocery items and whether each is on_shelf, held in hand, placing into a cart, or in_cart.` }] }],
+    messages: [{ role: "user", content: [imageBlock(image), { type: "text", text: `Already-confirmed cart labels (context only): ${cartLabels.join(", ") || "none"}. Describe visible grocery items and whether each is on_shelf, held in hand, placing into a cart, or in_cart. If an item is one of the cart labels above, use that exact label.` }] }],
     output_config: { format: zodOutputFormat(GroceryFrameSchema), effort: QUICK },
   });
   if (res.stop_reason === "refusal") throw new Error("Recognition declined");

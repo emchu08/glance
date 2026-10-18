@@ -4,7 +4,7 @@ export type Mode = "glimpse" | "grocery" | "gourmet";
 export type CaptureKind = "sample" | "webcam" | "native";
 export type MatchLevel = "exact" | "possible" | "similar";
 export type CommerceKind = "connect_merchant" | "integrated_merchant" | "external_link";
-export type PriceSource = "catalog" | "shelf-label" | "online" | "manual" | "unknown";
+export type PriceSource = "catalog" | "shelf-label" | "online" | "estimate" | "manual" | "unknown";
 
 export interface NormalizedBox {
   x: number;
@@ -156,7 +156,7 @@ export interface GroceryObservation {
   confidence: number;
   packageSize: string | null;
   priceCents: number | null;
-  /** Model estimate of a typical price, shown while no shelf or catalog price is known. Never billed. */
+  /** Model estimate of a typical price, used while no shelf, online or catalog price is known (marked ≈ / "est."). Never billed. */
   estimatedPriceCents?: number | null;
 }
 
