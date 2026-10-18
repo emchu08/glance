@@ -5,11 +5,13 @@ import {
 } from "react";
 import type { CaptureKind, Offer } from "@/data/types";
 import { createNativeAdapter, createSampleAdapter, createWebcamAdapter, type CaptureAdapter } from "./capture";
+import { cuesFor } from "./cues";
 import { moveFocus, moveLinear, reconcileFocus, type Direction } from "./navigation";
 import { initialState, lensReducer } from "./reducer";
 import { describeScreen, groceryQuery, isPayable, publishedActions, scanCoolingDown } from "./screens";
 import { loadPersisted, savePersisted, PAIR_KEY, PHONE_CODE_KEY } from "./storage";
 import * as svc from "./services";
+import { playTone, unlockAudio } from "./sound";
 import type { LensAction, LensEffect, LensEvent, LensState, OrderSummary } from "./types";
 
 export interface Diagnostics {
@@ -215,6 +217,21 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     const t = setTimeout(() => dispatch({ type: "grocery/clear-ack" }), TOAST_MS);
     return () => clearTimeout(t);
   }, [effectiveState.grocery.acknowledgement, dispatch]);
+
+  // ── Sound: a tone per result (no speech) ───────────────────────────────────
+  const heard = useRef(state);
+  useEffect(() => {
+    const prev = heard.current;
+    heard.current = state;
+    if (fixture || prev === state) return;
+    for (const tone of cuesFor(prev, state)) playTone(tone);
+  }, [state, fixture]);
+  useEffect(() => {
+    if (fixture) return;
+    window.addEventListener("pointerdown", unlockAudio, true);
+    window.addEventListener("keydown", unlockAudio, true);
+    return () => { window.removeEventListener("pointerdown", unlockAudio, true); window.removeEventListener("keydown", unlockAudio, true); };
+  }, [fixture]);
 
   // ── Visibility: pause analysis while hidden ───────────────────────────────
   const visible = useRef(true);
