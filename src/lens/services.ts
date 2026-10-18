@@ -134,7 +134,7 @@ type ListingEvent =
  * Reads the listing stream: cards as they are found, photo and price fill-ins for cards
  * already shown, then the ranked list. Returns the final list in its final order.
  */
-async function readNdjson(body: ReadableStream<Uint8Array>, emit: (offers: Offer[], replace: boolean) => void): Promise<Offer[]> {
+async function readNdjson(body: ReadableStream<Uint8Array>, emit: (offers: Offer[], replace: boolean) => void, status?: { complete: boolean }): Promise<Offer[]> {
   const reader = body.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -151,7 +151,7 @@ async function readNdjson(body: ReadableStream<Uint8Array>, emit: (offers: Offer
       const msg = JSON.parse(line) as ListingEvent;
       if (msg.type === "error") {
         // Offers already shown stay usable when the web search fails afterwards.
-        if (all.length) return all;
+        if (all.length) { reader.cancel().catch(() => {}); return all; }
         throw new ServiceError(msg.error);
       }
       if (msg.type === "offer") {
@@ -165,6 +165,7 @@ async function readNdjson(body: ReadableStream<Uint8Array>, emit: (offers: Offer
         emit([next], false);
       } else if ((msg.type === "ranked" || msg.type === "done") && Array.isArray(msg.offers)) {
         all = msg.offers;
+        if (msg.type === "done" && status) status.complete = true;
         emit(all, true);
       }
     }
@@ -185,8 +186,10 @@ export async function searchListings(query: string, onBatch: OfferBatch, signal?
   const p = (async () => {
     const res = await fetch("/api/glance/listings", { method: "POST", headers: { "content-type": "application/json", accept: "application/x-ndjson" }, body: JSON.stringify({ query }), signal: withTimeout(signal, 40_000) });
     if (!res.ok || !res.body) throw new ServiceError(`Listing search failed (${res.status})`, res.status);
-    const all = await readNdjson(res.body, (offers, replace) => onBatch(offers, false, replace));
-    listingCache.set(key, { offers: all, at: Date.now() });
+    const status = { complete: false };
+    const all = await readNdjson(res.body, (offers, replace) => onBatch(offers, false, replace), status);
+    // Only a finished, non-empty search is worth reusing; a partial or empty one is retried next time.
+    if (status.complete && all.length) listingCache.set(key, { offers: all, at: Date.now() });
     onBatch(all, true, true);
     return all;
   })();

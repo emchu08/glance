@@ -42,9 +42,9 @@ export function Lens({ interactive = true, scale = 1, instant = false, className
             <motion.div
               key={screenKey(state)}
               className="absolute inset-0"
-              initial={{ opacity: 0, filter: "blur(6px)", scale: 0.985 }}
-              animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { type: "spring", bounce: 0, duration: 0.34 } }}
-              exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
+              initial={{ opacity: 0, scale: 0.985 }}
+              animate={{ opacity: 1, scale: 1, transition: { type: "spring", bounce: 0, duration: 0.34 } }}
+              exit={{ opacity: 0, transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] } }}
             >
               <Screen />
             </motion.div>

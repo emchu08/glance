@@ -3,9 +3,11 @@ import type { Offer } from "@/data/types";
 import { demoMerchantOffersFor, sampleOffersForLabel } from "@/domain/sample";
 import { sponsoredOfferFor } from "@/server/ads";
 import { lensListings, lensListingStream } from "@/server/listings";
+import { searchListingsStream } from "@/server/listings/search";
 import { aiConfigured, supabaseConfigured } from "@/server/env";
-import { errorResponse, json, readJson } from "@/server/http";
-import { currentUser } from "@/server/supabase";
+import { clientKey, errorResponse, json, readJson } from "@/server/http";
+import { rateLimit } from "@/server/relay";
+import { currentUser, HttpError } from "@/server/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,6 +19,13 @@ export async function POST(req: Request) {
   try {
     const body = await readJson(req, Body);
     const label = [body.candidate.brand, body.candidate.label, body.candidate.variant].filter(Boolean).join(" ");
+    const live = !body.sample && aiConfigured();
+    if (live) {
+      if (!(await rateLimit(`offers:${clientKey(req)}`, 60, 60_000))) throw new HttpError(429, "Too many searches. Wait a moment and try again.", "rate_limited");
+      // Start the shared web search now; the account and sponsored lookups below run while it does,
+      // and the response stream joins this same search instead of starting a second one.
+      void searchListingsStream(label).catch(() => {});
+    }
     const user = supabaseConfigured() ? await currentUser().catch(() => null) : null;
     const demo = demoMerchantOffersFor(body.candidate.label, body.candidate.id);
     const sponsored = supabaseConfigured() ? await sponsoredOfferFor(label, user?.id ?? null).catch(() => null) : null;

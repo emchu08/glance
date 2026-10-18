@@ -5,7 +5,9 @@ import { formatCents } from "@/domain/money";
 import { CACHE_TTL, readCache, writeCache } from "@/server/cache";
 import { groceryInsight } from "@/server/claude";
 import { aiConfigured } from "@/server/env";
-import { errorResponse, imageSchema, json, readJson } from "@/server/http";
+import { clientKey, errorResponse, imageSchema, json, readJson } from "@/server/http";
+import { rateLimit } from "@/server/relay";
+import { HttpError } from "@/server/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -21,6 +23,7 @@ export async function POST(req: Request) {
     const cacheKey = [body.productKey, body.label, body.packageSize];
     const cached = await readCache<{ insight: ItemInsight; model: string }>("insight", cacheKey);
     if (cached) return json({ ...cached, cached: true });
+    if (!(await rateLimit(`insight:${clientKey(req)}`, 90, 60_000))) throw new HttpError(429, "Too many item lookups. Wait a moment and try again.", "rate_limited");
     const history = PURCHASE_HISTORY[body.productKey];
     const comps = comparisonsFor(body.productKey);
     const r = await groceryInsight(body.label, body.packageSize ?? null, body.image ?? null, {

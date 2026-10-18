@@ -3,7 +3,8 @@ import { rankCandidates } from "@/domain/glimpse/interest";
 import { sampleGlimpseFrame } from "@/domain/sample";
 import { recognizeScene } from "@/server/claude";
 import { aiConfigured } from "@/server/env";
-import { errorResponse, imageSchema, json, readJson } from "@/server/http";
+import { clientKey, errorResponse, imageSchema, json, readJson } from "@/server/http";
+import { rateLimit } from "@/server/relay";
 import { HttpError } from "@/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
       return json({ candidates: r.ranked, ranker: "interest-v1", perception: { model: "sample", latencyMs: Date.now() - t0 } });
     }
     if (!aiConfigured()) throw new HttpError(503, "Live recognition is not configured on this deployment", "ai_unconfigured");
+    if (!(await rateLimit(`glimpse:${clientKey(req)}`, 60, 60_000))) throw new HttpError(429, "Too many scans. Wait a moment and try again.", "rate_limited");
     const r = await recognizeScene(body.image);
     const seen = body.persistence ?? {};
     const ranked = rankCandidates(r.candidates, { seenCounts: Object.fromEntries(r.candidates.map((c) => [c.id, (seen[c.label.toLowerCase()] ?? 0) + 1])), preferredCategories: body.preferences });

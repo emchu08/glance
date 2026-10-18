@@ -356,7 +356,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
       }
       case "grocery-online": {
         // Live prices for a held item: the same grounded listing search, kept per item.
-        if (s.capture === "sample" || s.grocery.online?.[effect.productKey]) break;
+        const known = s.grocery.online?.[effect.productKey];
+        if (s.capture === "sample" || (known && known.status !== "error")) break;
         dispatch({ type: "grocery/online", productKey: effect.productKey, status: "loading", offers: [] });
         const c = begin(`online:${effect.productKey}`);
         svc.searchListings(effect.query, (offers, done, replace) => {
@@ -618,7 +619,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
   }, [activate]);
 
   // Back does what the top bar's Back does (at a mode's root that's the picker).
-  const back = useCallback(() => (actions.some((a) => a.id === "hdr-back") ? activate("hdr-back") : dispatch({ type: "nav/back" })), [actions, activate, dispatch]);
+  const back = useCallback(() => (describeScreen(stateRef.current).some((a) => a.id === "hdr-back") ? activate("hdr-back") : dispatch({ type: "nav/back" })), [activate, dispatch]);
 
   const sceneIndex = effectiveState.mode === "grocery" ? Math.max(0, effectiveState.grocery.frameIndex - 1) : effectiveState.mode === "glimpse" ? Math.max(0, effectiveState.glimpse.frameIndex - 1) : 0;
   const sceneUrl = adapter.sceneUrl(effectiveState.mode, sceneIndex);
