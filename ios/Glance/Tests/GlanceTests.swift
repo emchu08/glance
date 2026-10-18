@@ -125,31 +125,24 @@ final class GlanceTests: XCTestCase {
 }
 
 @MainActor
-final class CameraOnDemandTests: XCTestCase {
-    func testCameraTurnsOnForScansAndOffWhenTheyStop() async throws {
+final class CameraStaysOnTests: XCTestCase {
+    func testCameraIsNeverTurnedOffBetweenScans() async throws {
         let glasses = FakeGlasses()
         let model = AppModel(transport: glasses)
-        model.cameraIdleSeconds = 0.3
         model.cameraDemanded()
         XCTAssertEqual(glasses.resumes, 0, "Never on before the camera is ready")
 
         model.cameraReady = true
         model.cameraDemanded()
         try await Task.sleep(for: .milliseconds(50))
-        XCTAssertEqual(glasses.resumes, 1, "A scan turns the camera on")
-        // Grocery asks again every few seconds: one camera start, kept on.
+        XCTAssertEqual(glasses.resumes, 1, "A scan turns the camera on if it isn't")
         for _ in 0..<3 {
             try await Task.sleep(for: .milliseconds(150))
             model.cameraDemanded()
         }
-        XCTAssertEqual(glasses.resumes, 1)
-        XCTAssertEqual(glasses.pauses, 0, "Stays on while scans keep asking")
         try await Task.sleep(for: .milliseconds(600))
-        XCTAssertEqual(glasses.pauses, 1, "Off once scans stop asking")
-
-        model.cameraDemanded()
-        try await Task.sleep(for: .milliseconds(50))
-        XCTAssertEqual(glasses.resumes, 2, "The next scan turns it on again")
+        XCTAssertEqual(glasses.resumes, 1)
+        XCTAssertEqual(glasses.pauses, 0, "Stays on between scans")
     }
 }
 

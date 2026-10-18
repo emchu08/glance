@@ -49,12 +49,9 @@ final class AppModel {
     var launchStatus = "Connecting to your glasses…"
     var showWallet = false
     var isLaunching = false
-    /// The camera is ready to turn on for a scan (it is off between scans).
+    /// The camera is connected; it streams from launch and stays on.
     var cameraReady = false
     private var cameraOn = false
-    private var cameraIdle: Task<Void, Never>?
-    /// How long the camera stays on after the last picture a scan asked for (Grocery asks every few seconds).
-    var cameraIdleSeconds: Double = 12
     /// What the glasses camera is doing until it delivers frames ("waiting for the glasses", "paused"…).
     var cameraStatus = ""
     /// The newest glasses camera frame, for the phone's camera tile (at most 15 a second).
@@ -98,7 +95,7 @@ final class AppModel {
             }
             if state == .sessionExpired || state == .idle {
                 self.lensBridge.clearCamera(); self.lastFrameAt = nil
-                self.cameraReady = false; self.cameraOn = false; self.cameraIdle?.cancel()
+                self.cameraReady = false; self.cameraOn = false
             }
             if state == .sessionExpired { self.reportError("Glasses disconnected. Tap Reconnect.") }
         }
@@ -184,6 +181,9 @@ final class AppModel {
             guard wantsLaunch else { return }
             launchStatus = "Getting the glasses camera ready…"
             try await transport.startCamera()
+            // On from launch and left on: turning the camera on later, next to the display, failed on the glasses.
+            try await transport.resumeCamera()
+            cameraOn = true
             cameraReady = true
             lensBridge.setCameraStandby(true)
             guard wantsLaunch else { return }
@@ -195,22 +195,12 @@ final class AppModel {
         } catch { reportError(error.localizedDescription) }
     }
 
-    /// A scan asked for a picture: turn the camera on, and off again once scans stop asking.
+    /// A scan asked for a picture. The camera stays on, so this only turns it back on if it isn't.
     func cameraDemanded() {
-        guard cameraReady else { return }
-        cameraIdle?.cancel()
-        if !cameraOn {
-            cameraOn = true
-            log("camera on for a scan")
-            Task { do { try await transport.resumeCamera() } catch { self.cameraOn = false; self.reportError(error.localizedDescription) } }
-        }
-        cameraIdle = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(self?.cameraIdleSeconds ?? 12)) } catch { return }
-            guard let self, self.cameraOn else { return }
-            self.cameraOn = false
-            self.transport.pauseCamera()
-            self.log("camera off (no scan for \(Int(self.cameraIdleSeconds)) s)")
-        }
+        guard cameraReady, !cameraOn else { return }
+        cameraOn = true
+        log("camera on for a scan")
+        Task { do { try await transport.resumeCamera() } catch { self.cameraOn = false; self.reportError(error.localizedDescription) } }
     }
 
     func reportError(_ message: String) {

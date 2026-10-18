@@ -5,7 +5,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { Candidate, DishHypothesis, GroceryObservation, Recipe } from "@/data/types";
 import { GROCERY_CATALOG } from "@/data/grocery";
-import { matchCatalogProduct, normalizedLabelKey } from "@/domain/grocery/matching";
+import { normalizedLabelKey } from "@/domain/grocery/matching";
 import { parseUsdLabel } from "@/domain/money";
 import { aiConfigured, env } from "./env";
 
@@ -46,11 +46,11 @@ const Detection = z.object({
   brand: z.string(),
   color: z.string(),
   box: z.array(z.number()).length(4).describe("x1,y1,x2,y2 on a 0–1000 grid"),
-  product_name: z.string(),
+  product_name: z.string().describe("Exact product as printed or as its packaging shows: brand + product line + flavor/variant, e.g. \"Celsius Sparkling Orange Energy Drink\"; empty if unknown"),
   variant: z.string(),
   confidence: z.number(),
   description: z.string(),
-  search_query: z.string(),
+  search_query: z.string().describe("The most specific shopping search: brand, product name, variant and size when known"),
 });
 const SceneSchema = z.object({
   found: z.boolean(),
@@ -69,7 +69,7 @@ export async function recognizeScene(image: string): Promise<{ candidates: Candi
   const res = await anthropic().messages.parse({
     model: MODEL(),
     max_tokens: 2000,
-    system: `You are the vision module of a shopping assistant for smart glasses. Return visible shoppable objects only (clothing, bags, shoes, electronics, packaged goods). ${SAFETY} Use brand/product_name only when visibly supported by a logo or legible text; otherwise empty strings and a generic search_query.`,
+    system: `You are the vision module of a shopping assistant for smart glasses. Return visible shoppable objects only (clothing, bags, shoes, electronics, packaged goods). ${SAFETY} Identify products as precisely as the image allows: read the logo, name, flavor and size on the packaging, and name the exact product (a Celsius can is "Celsius Sparkling Orange Energy Drink", not "energy drink can"). A brand is visibly supported when its name, logo or distinctive packaging is in view; only when none is, leave brand and product_name empty and describe the item specifically (color, material, style).`,
     messages: [{ role: "user", content: [imageBlock(image), { type: "text", text: "Identify the primary shoppable object the wearer is most likely looking at (centered, prominent) and other visible shoppable objects." }] }],
     output_config: { format: zodOutputFormat(SceneSchema), effort: QUICK },
   });
@@ -77,9 +77,18 @@ export async function recognizeScene(image: string): Promise<{ candidates: Candi
   const out = res.parsed_output;
   if (!out || !out.found || !out.primary) return { candidates: [], query: null, model: res.model };
   const p = out.primary;
-  const primary: Candidate = { id: `live-${normalizedLabelKey(p.object_type)}-0`, label: cap(p.object_type), category: p.category || "other", attributes: [p.color, p.variant].filter(Boolean), confidence: clamp01(p.confidence), box: boxFrom(p.box), brand: p.brand || undefined, variant: p.variant || undefined, primary: true };
-  const others = out.others.slice(0, 4).map((o, i) => ({ id: `live-${normalizedLabelKey(o.object_type)}-${i + 1}`, label: cap(o.object_type), category: o.category || "other", attributes: [o.color].filter(Boolean), confidence: 0.5, box: boxFrom(o.box), brand: o.brand || undefined }));
+  const label = productLabel(p);
+  const primary: Candidate = { id: `live-${normalizedLabelKey(label)}-0`, label, category: p.category || "other", attributes: [p.color, p.variant].filter(Boolean), confidence: clamp01(p.confidence), box: boxFrom(p.box), brand: p.brand || undefined, variant: p.variant || undefined, primary: true };
+  const others = out.others.slice(0, 4).map((o, i) => ({ id: `live-${normalizedLabelKey(productLabel(o))}-${i + 1}`, label: productLabel(o), category: o.category || "other", attributes: [o.color].filter(Boolean), confidence: 0.5, box: boxFrom(o.box), brand: o.brand || undefined }));
   return { candidates: [primary, ...others], query: p.search_query || null, model: res.model };
+}
+
+/** The exact product when it's known, else the brand with the kind of object, never just the kind. */
+function productLabel(d: { object_type: string; brand: string; product_name?: string }): string {
+  const name = d.product_name?.trim();
+  if (name) return cap(name);
+  const brand = d.brand.trim();
+  return cap(brand && !d.object_type.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${d.object_type}` : d.object_type);
 }
 
 const estimateCents = (usd: number | null) => (usd !== null && usd > 0 && usd < 1000 ? Math.round(usd * 100) : null);
@@ -90,7 +99,7 @@ const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 const GroceryFrameSchema = z.object({
   items: z.array(z.object({
-    label: z.string(), state: z.enum(["on_shelf", "held", "placing", "in_cart"]), confidence: z.number(), package_size: z.string().nullable(), price_label: z.string().nullable(),
+    label: z.string().describe("The exact product: brand + product + flavor/variety as printed, e.g. \"Celsius Sparkling Orange Energy Drink\", \"Arrowhead Mountain Spring Water\"; no size. A generic name only when no brand or name is readable"), state: z.enum(["on_shelf", "held", "placing", "in_cart"]), confidence: z.number(), package_size: z.string().nullable(), price_label: z.string().nullable(),
     typical_price_usd: z.number().nullable().describe("Typical US grocery price for this exact item and size when no shelf price is readable; null if unknown"),
   })).max(5),
 });
@@ -100,14 +109,14 @@ export async function recognizeGroceryFrame(image: string, cartLabels: string[])
     model: MODEL(),
     max_tokens: 1500,
     system: `You observe one grocery frame at a time for a shopping tracker. Report at most five prominent items with their state in THIS frame only. Do not decide whether an item was newly added; the tracker owns that. Copy a readable shelf price exactly or return null; separately give a typical US price estimate for held items. ${SAFETY}`,
-    messages: [{ role: "user", content: [imageBlock(image), { type: "text", text: `Already-confirmed cart labels (context only): ${cartLabels.join(", ") || "none"}. Describe visible grocery items and whether each is on_shelf, held in hand, placing into a cart, or in_cart. Reuse a cart label only for the identical product (same brand, variety and size); any other product gets its own label, even if it looks similar.` }] }],
+    messages: [{ role: "user", content: [imageBlock(image), { type: "text", text: `Labels already in use, in the cart or in hand (context only): ${cartLabels.join(", ") || "none"}. Describe visible grocery items and whether each is on_shelf, held in hand, placing into a cart, or in_cart. Read each package and name the exact product, never just its category. Reuse a label above only for the identical product (same brand, variety and size), word for word; any other product gets its own label, even if it looks similar.` }] }],
     output_config: { format: zodOutputFormat(GroceryFrameSchema), effort: QUICK },
   });
   if (res.stop_reason === "refusal") throw new Error("Recognition declined");
   const items = res.parsed_output?.items ?? [];
   const observations: GroceryObservation[] = items.map((it) => {
-    const product = matchCatalogProduct(it.label);
-    return { productKey: product?.id ?? normalizedLabelKey(it.label), label: product?.name ?? cap(it.label), state: it.state, confidence: clamp01(it.confidence), packageSize: it.package_size ?? product?.size ?? null, priceCents: parseUsdLabel(it.price_label), estimatedPriceCents: estimateCents(it.typical_price_usd) };
+    // The exact product the camera read; never swapped for a generic sample-catalog item.
+    return { productKey: normalizedLabelKey(it.label), label: cap(it.label), state: it.state, confidence: clamp01(it.confidence), packageSize: it.package_size, priceCents: parseUsdLabel(it.price_label), estimatedPriceCents: estimateCents(it.typical_price_usd) };
   });
   return { observations, model: res.model };
 }

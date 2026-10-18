@@ -535,7 +535,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const frame = await adapterRef.current.capture("grocery", s.grocery.frameIndex);
         lastFrame.current = frame;
         const t0 = performance.now();
-        const r = await svc.recognizeGroceryFrame(frame, s.grocery.cart.map((l) => l.label), c.signal);
+        const known = [...new Set([...s.grocery.cart.map((l) => l.label), ...(s.grocery.heldLabel ? [s.grocery.heldLabel] : [])])];
+        const r = await svc.recognizeGroceryFrame(frame, known, c.signal);
         setDiag((d) => ({ ...d, frames: d.frames + 1, lastLatencyMs: Math.round(performance.now() - t0) }));
         if (cancelled || stateRef.current.session !== session) return;
         // A frame taken before an add would still show the item in hand: drop it.

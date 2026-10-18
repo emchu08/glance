@@ -7,7 +7,7 @@ import { CATALOG_BY_ID } from "@/data/grocery";
 import { additionSignature, addIngredientsToList, scaleIngredients } from "@/domain/gourmet/list";
 import { groceryCardPrice } from "./groceryPrice";
 import { initialState as emptyLens } from "./initial";
-import { ROOT_SCREEN, type LensEvent, type LensState, type Screen } from "./types";
+import { ROOT_SCREEN, type LensEvent, type LensState, type Screen, type ScreenId } from "./types";
 
 export { emptyLens as initialState };
 
@@ -21,15 +21,51 @@ function replace(state: LensState, screen: Screen): LensState {
   return { ...state, screen, focusId: null, windowStart: 0, revision: state.revision + 1 };
 }
 
+/**
+ * Where Back leads from each screen, nearest first. Back returns to the nearest of these still in
+ * the history (dropping everything above it), else to the mode's main screen, so it never retraces
+ * pop-ups or confirmations. Screens not listed here step back through the history.
+ */
+const BACK_TO: Partial<Record<ScreenId, ScreenId[]>> = {
+  "glimpse-offers": ["glimpse"],
+  "glimpse-candidates": ["glimpse-offers", "glimpse"],
+  "glimpse-cart": ["glimpse"],
+  "glimpse-cart-item": ["glimpse-cart", "glimpse"],
+  "grocery-item": ["grocery"],
+  "grocery-compare": ["grocery-item", "grocery"],
+  "grocery-edit": ["grocery"],
+  "grocery-manual": ["grocery"],
+  "grocery-list": ["grocery"],
+  "grocery-checkout": ["grocery"],
+  "grocery-bought": ["grocery"],
+  "grocery-find": ["grocery-list", "grocery"],
+  "gourmet-recipes": ["gourmet"],
+  "gourmet-recipe": ["gourmet-recipes", "gourmet"],
+  "gourmet-steps": ["gourmet-recipe", "gourmet-recipes", "gourmet"],
+  "gourmet-shop": ["gourmet-recipe", "gourmet-recipes", "gourmet"],
+  "gourmet-added": ["gourmet-recipe", "gourmet-recipes", "gourmet"],
+  "wallet-order": ["wallet-orders", "wallet"],
+};
+/** Pop-ups and confirmations: Back passes over them. */
+const PASSING: ReadonlySet<ScreenId> = new Set<ScreenId>(["more", "handoff", "glimpse-candidates", "gourmet-added", "grocery-bought", "nav", "connect"]);
+
 function back(state: LensState): LensState {
   if (state.composer) return { ...state, composer: null, revision: state.revision + 1 };
-  if (state.stack.length === 0) {
-    const root = ROOT_SCREEN[state.mode];
-    if (state.screen.id === root) return state;
-    return replace(state, { id: root });
-  }
+  const home = ROOT_SCREEN[state.mode];
   const stack = [...state.stack];
-  const screen = stack.pop()!;
+  const targets = BACK_TO[state.screen.id];
+  let screen: Screen | undefined;
+  if (targets) {
+    const at = stack.findLastIndex((s) => targets.includes(s.id));
+    screen = at >= 0 ? stack.splice(at)[0] : undefined;
+    if (!screen) stack.length = 0;
+  } else {
+    do screen = stack.pop(); while (screen && PASSING.has(screen.id) && stack.length);
+  }
+  if (!screen) {
+    if (state.screen.id === home) return state;
+    screen = { id: home };
+  }
   return { ...state, stack, screen, focusId: null, windowStart: 0, revision: state.revision + 1 };
 }
 

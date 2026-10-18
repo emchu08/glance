@@ -253,3 +253,45 @@ test("composer edits the listings query and Done commits it", () => {
   assert.equal(s.listings.query, "tot");
   assert.equal(s.composer, null);
 });
+
+test("Back goes to the page a screen belongs under, passing over pop-ups and confirmations", () => {
+  const nav = (s: LensState, ...ids: LensState["screen"][]) => ids.reduce((x, screen) => lensReducer(x, { type: "nav/push", screen }), s);
+  const back = (s: LensState) => lensReducer(s, { type: "nav/back" });
+
+  // Gourmet: recipe → steps → added to list → More. Back: steps, the recipe, the recipe list, the scan.
+  let s = lensReducer(boot(), { type: "mode/set", mode: "gourmet" });
+  s = nav(s, { id: "gourmet-recipes" }, { id: "gourmet-recipe", params: { recipeId: "r1" } }, { id: "gourmet-steps", params: { recipeId: "r1", page: 0 } }, { id: "gourmet-added" }, { id: "more", params: { of: "gourmet-added" } });
+  s = back(s);
+  assert.equal(s.screen.id, "gourmet-steps", "More and the confirmation under it are passed over");
+  s = back(s);
+  assert.equal(s.screen.id, "gourmet-recipe");
+  assert.equal(s.screen.params?.recipeId, "r1");
+  s = back(s);
+  assert.equal(s.screen.id, "gourmet-recipes");
+  s = back(s);
+  assert.equal(s.screen.id, "gourmet");
+  assert.equal(s.stack.length, 0);
+
+  // Grocery: compare reached through the list and a sent link still goes back to the item, then the cart.
+  s = lensReducer(boot(), { type: "mode/set", mode: "grocery" });
+  s = nav(s, { id: "grocery-list" }, { id: "grocery-item", params: { productKey: "k" } }, { id: "handoff" }, { id: "grocery-compare", params: { productKey: "k" } });
+  s = back(s);
+  assert.equal(s.screen.id, "grocery-item");
+  s = back(s);
+  assert.equal(s.screen.id, "grocery", "the cart, not the list it was opened over");
+  assert.equal(s.stack.length, 0);
+
+  // Glimpse: a cart item opened from offers goes back to the cart, then the scan.
+  s = lensReducer(boot(), { type: "mode/set", mode: "glimpse" });
+  s = nav(s, { id: "glimpse-offers" }, { id: "glimpse-candidates" }, { id: "glimpse-cart" }, { id: "glimpse-cart-item", params: { offerId: "o" } });
+  s = back(s);
+  assert.equal(s.screen.id, "glimpse-cart");
+  s = back(s);
+  assert.equal(s.screen.id, "glimpse");
+
+  // A screen with no set parent steps back, skipping a confirmation under it.
+  s = lensReducer(boot(), { type: "mode/set", mode: "glimpse" });
+  s = nav(s, { id: "glimpse-offers" }, { id: "handoff" }, { id: "wallet" });
+  s = back(s);
+  assert.equal(s.screen.id, "glimpse-offers");
+});

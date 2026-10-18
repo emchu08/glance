@@ -2,7 +2,7 @@ import SwiftUI
 import WebKit
 
 /// The phone half of Glance: connects the glasses on launch and draws the Glance screens on them. Their
-/// camera turns on only while a scan wants pictures. The phone shows the glasses camera and the Glance
+/// camera stays on once connected. The phone shows the glasses camera and the Glance
 /// screens side by side; tapping the screens drives the glasses, so a guide can lead without the Neural Band.
 struct LauncherView: View {
     @Environment(AppModel.self) private var model
@@ -128,7 +128,7 @@ private struct CameraPreview: View {
                 if let image = model.cameraPreview, model.cameraLive {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
-                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Connecting the glasses…" : "Camera off until a scan") : "Camera \(model.cameraStatus)", systemImage: "video.slash")
+                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Connecting the glasses…" : "Glasses camera off") : "Camera \(model.cameraStatus)", systemImage: "video.slash")
                         .font(.caption).foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center).padding()
                 }

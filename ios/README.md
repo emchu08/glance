@@ -11,11 +11,10 @@ display and the camera together: the display connects first and the camera
 joins behind it, so the screens never give way to the camera. Each changed
 screen is a full 600×600 image over Bluetooth; unchanged screens are never resent.
 
-**Camera:** off until a scan wants a picture. Launch only gets it ready
-(permission, capability started); a scan's frame request turns the stream on,
-and it turns off 12 s after the last request. Grocery's live scanning asks every
-few seconds, so it stays on while scanning is on. If no frame arrives in 10 s the
-stream restarts once, then falls back to Meta's default setup (low, 24 fps).
+**Camera:** on from launch, right after the display, and left on. Starting the
+stream later, on demand, ended it with a critical error on the glasses and took
+the display down with it. If no frame arrives in 10 s the stream restarts once,
+then falls back to Meta's default setup (low, 24 fps).
 
 **Phone:** the glasses camera and the Glance screens **side by side** (camera on the
 left, Glance on the right), never on top of each other. In portrait the Glance side
