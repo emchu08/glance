@@ -131,6 +131,8 @@ export interface PaymentState {
   error: string | null;
   attemptKey: string | null;
   originMode: Mode | null;
+  /** Paid on the glasses with Stripe's test card (no sign-in, no saved card). */
+  demo?: boolean;
 }
 
 export interface WalletState {
@@ -266,6 +268,7 @@ export type LensEvent =
   | { type: "payment/submit"; attemptKey: string }
   | { type: "payment/status"; status: PaymentStatus; orderId?: string; order?: OrderSummary | null; error?: string }
   | { type: "payment/clear" }
+  | { type: "payment/demo-start"; offerId: string; originMode: Mode; attemptKey: string }
   // composer
   | { type: "composer/open"; field: string; value: string }
   | { type: "composer/type"; char: string }
@@ -291,6 +294,7 @@ export type LensEffect =
   | { kind: "open-url"; url: string }
   | { kind: "quote"; offerId: string }
   | { kind: "purchase"; offerId: string }
+  | { kind: "demo-purchase"; offerId: string; attemptKey: string }
   | { kind: "retry-purchase" }
   | { kind: "wallet-refresh" }
   | { kind: "wallet-pause-rule"; pause: boolean }

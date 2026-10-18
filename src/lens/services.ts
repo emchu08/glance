@@ -221,6 +221,13 @@ export async function getOrder(orderId: string, signal?: AbortSignal): Promise<O
   return res.order;
 }
 
+export interface DemoPayment { status: string; id: string; reference: string; totalCents: number; card: string; createdAt: string }
+
+/** Buy with Stripe's test card, on the glasses: no sign-in or saved card. A repeated attempt key returns the same payment. */
+export async function demoPurchase(offer: Offer, attemptKey: string, signal?: AbortSignal): Promise<DemoPayment> {
+  return postJson("/api/payments/demo", { offerId: offer.id, name: offer.name, retailer: offer.retailer, priceCents: offer.priceCents, attemptKey }, signal);
+}
+
 export async function requestQuote(offer: Offer, quantity = 1, signal?: AbortSignal): Promise<Quote> {
   const res = await postJson<{ quote: Quote }>("/api/orders/quote", { merchantId: offer.merchantId, lines: [{ sku: offer.sku, quantity }] }, signal);
   return res.quote;

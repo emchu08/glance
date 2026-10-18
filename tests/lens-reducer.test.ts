@@ -51,6 +51,28 @@ test("reset preserves saved offers, recipes, list and pending payment but clears
   assert.equal(s.payment.status, "pending");
 });
 
+test("any priced listing is bought on the glasses with the Stripe test card, guarded against repeats", () => {
+  let s = fixtureState("external-offer", false, boot());
+  const buy = describeScreen(s).find((a) => a.id === "buy")!;
+  const offer = s.glimpse.offers.find((o) => o.id === s.glimpse.offerId)!;
+  assert.ok(offer.priceCents !== null && offer.kind === "external_link", "an ordinary store listing");
+  assert.match(buy.label, /^Buy \$/);
+  assert.equal(buy.effect?.kind, "demo-purchase", "pays here; nothing is sent to the phone");
+  for (const e of buy.events) s = lensReducer(s, e);
+  assert.equal(s.payment.status, "pending");
+  assert.equal(s.payment.demo, true);
+  const key = s.payment.attemptKey;
+  assert.equal(lensReducer(s, { type: "payment/demo-start", offerId: offer.id, originMode: "glimpse", attemptKey: "again" }).payment.attemptKey, key, "a second press while paying is ignored");
+  assert.equal(describeScreen(s).find((a) => a.id === "pay-wait")?.disabled, true);
+
+  const done = lensReducer(s, { type: "payment/status", status: "confirmed", orderId: "pi_1" });
+  assert.deepEqual(describeScreen(done).filter((a) => a.id.startsWith("pay-")).map((a) => a.id), ["pay-done"]);
+  const failed = lensReducer(s, { type: "payment/status", status: "error", error: "Your card was declined." });
+  const retry = describeScreen(failed).find((a) => a.id === "pay-retry")!;
+  assert.equal(retry.effect?.kind, "demo-purchase");
+  assert.notEqual(retry.effect?.kind === "demo-purchase" && retry.effect.attemptKey, key, "a retry is a new attempt");
+});
+
 test("payment submit is guarded against repeats and the Buy label equals the quote total", () => {
   let s = fixtureState("payment-ready", false, boot());
   const buy = describeScreen(s).find((a) => a.id === "buy")!;
