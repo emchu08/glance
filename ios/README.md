@@ -1,26 +1,39 @@
 # Glance iPhone companion
 
-The companion uses Meta Wearables DAT **1.0.1** with Meta Ray-Ban Display.
-The full-screen white-and-blue phone app shows the **same interactive lens** sent
-to the glasses. Tap it to shop on the phone. **Wallet** opens account/card setup
-with the same cookies, and returning refreshes the lens wallet without resetting
-its cart. **Connect glasses** starts registration, display, controls and camera.
+The companion uses Meta Wearables DAT **1.0.1** with Meta Ray-Ban Display. It
+connects to the glasses on launch (there is no start button) and starts the
+glasses camera first. **Wallet** opens account/card setup.
 
-The glasses retain their existing in-app navigation; there is no second toolbar.
-The selected action has a white fill and blue inset outline, including on pills.
-Grocery clearly shows paused, camera unavailable, capturing, identifying, no item
-recognized, and scanning states. Other modes retain their existing progress UI;
-the phone also explains the current request (including listing searches/errors).
+## Two ways to show Glance on the glasses
+
+**Glance on glasses (default, smooth).** The lens runs as a Meta Ray-Ban Display
+*Web App*, rendered by the glasses themselves at their own frame rate. Web Apps
+cannot use the camera, so the phone streams the glasses camera (DAT, camera only)
+to the relay twice a second and the web app reads frames from there. The phone
+has one long-lived relay code, built into the web app's address, so nothing is
+typed per session. One-time setup, shown on the phone with a Copy button:
+Meta AI → Developer Mode → App Settings → Web Apps → Connect Web App → paste the
+address → open Glance from the glasses' app grid and pin it. The phone shows a
+live view of the glasses camera and whether Glance is open on the glasses. When
+the phone is signed in, it hands the account to the glasses once (single use,
+two minutes) so Buy works there; the glasses browser keeps its own cookies.
+
+**Mirror phone (fallback).** The phone renders the lens and sends each changed
+screen to the display over Bluetooth (DAT display + inputs). Every update is a
+full 600×600 image, so this is limited by Bluetooth, not by the app; unchanged
+screens are never resent. The phone's lens is covered until the camera is live.
+
+Not yet verified on hardware: whether DAT camera streaming continues while a
+Web App is in the foreground on the glasses. If it does not, use Mirror phone.
 
 ## Run
 
 1. Pair and update the Display glasses in Meta AI and enable Developer Mode.
 2. Open `ios/Glance.xcodeproj`, select **Glance** and your iPhone, and choose your
    Apple development team in **Signing & Capabilities** if not already set.
-3. Press **Cmd-R**. Use **Wallet** on the phone to sign in/save a card, and tap
-   **Connect glasses**. Approve Meta AI registration/camera prompts and return.
-4. Enter Grocery and choose **Start scan**. The status card says what is happening.
-   When paused with items in your cart, **More → Start scan** resumes scanning.
+3. Press **Cmd-R**. Approve the Meta AI registration/camera prompts and return.
+   Use **Wallet** on the phone to sign in/save a card.
+4. Follow the on-phone setup card once to add Glance to the glasses, then open it there.
 
 Direct glasses controls require **MWDATInputs** enabled in Wearables Developer
 Center. Temple swipes move through existing actions; Neural Band directions move
@@ -34,7 +47,7 @@ Server/payment secrets never go in the app.
 
 ## Runtime and performance
 
-The runtime is fixed to `https://glance-blue.vercel.app/lens?source=native&companion=3`.
+The runtime is fixed to `https://glance-blue.vercel.app/lens?source=native&companion=4&pair=<code>`.
 There is no alternate server or legacy app switch. Code caches/service workers
 are cleared on launch while wallet cookies remain. The iOS build bundles both
 `src/lens/lens.css` and `Glance/Resources/native-lens.js`; these fixes therefore

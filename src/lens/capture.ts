@@ -106,10 +106,12 @@ export function createNativeAdapter(codeRef: { current: string | null }): Captur
     stop() { state = "idle"; },
     async capture(_mode, index, opts) {
       const code = codeRef.current;
-      if (!code) throw new Error("Not paired");
+      // Inside the iPhone companion, frames come from the phone directly and need no relay code.
+      const companion = typeof window !== "undefined" && "glanceCompanion" in window;
+      if (!code && !companion) throw new Error("Not paired");
       const deadline = Date.now() + 12_000;
       for (;;) {
-        const res = await fetch(`/api/relay/frame?code=${encodeURIComponent(code)}&demand=1`, { cache: "no-store" });
+        const res = await fetch(`/api/relay/frame?code=${encodeURIComponent(code ?? "")}&demand=1`, { cache: "no-store" });
         if (res.status === 204 || !res.ok) {
           if (Date.now() > deadline) { state = "stale"; throw new Error("No fresh frame from your phone"); }
           await new Promise((r) => setTimeout(r, 700));

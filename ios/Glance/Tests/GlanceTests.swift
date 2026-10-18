@@ -99,11 +99,14 @@ final class GlanceTests: XCTestCase {
         XCTAssertEqual(sender.delivered?.revision, 3)
     }
 
-    func testPairingCodeValidation() async {
-        let model = await AppModel()
-        await model.pair(code: "abc")
-        let status = await model.relayStatus
-        XCTAssertTrue(status.contains("6-character"))
+    func testRelayCodeIsStableAndCarriedByBothLensURLs() {
+        XCTAssertTrue(Config.isRelayCode(Config.relayCode))
+        XCTAssertEqual(Config.relayCode, Config.relayCode)
+        XCTAssertFalse(Config.isRelayCode("ABC1I0"), "Ambiguous characters are never issued")
+        for url in [Config.lensURL, Config.glassesAppURL] {
+            XCTAssertTrue(url.absoluteString.contains("pair=\(Config.relayCode)"))
+            XCTAssertTrue(Config.allowsLensNavigation(url))
+        }
     }
 
     func testConnectionRecoveryCopy() {

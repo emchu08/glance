@@ -2,26 +2,27 @@ import XCTest
 
 final class GlanceUITests: XCTestCase {
     @MainActor
-    func testLivePhonePreviewAndWalletRemainAccessible() {
+    func testLaunchConnectsAndBothModesAndWalletRemainAccessible() {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["phone-wallet"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["open-glance"].isHittable)
-        let runtime = app.webViews.firstMatch
-        XCTAssertTrue(runtime.exists)
+        // Launch connects by itself: no start button, and no lens until a mode needs one.
+        XCTAssertTrue(app.descendants(matching: .any)["camera-card"].waitForExistence(timeout: 10) || app.descendants(matching: .any)["live-lens"].exists)
+        let mode = app.segmentedControls["glasses-mode"]
+        XCTAssertTrue(mode.waitForExistence(timeout: 10))
         XCTAssertEqual(app.tabBars.count, 0)
+
+        mode.buttons["Mirror phone"].tap()
+        let runtime = app.webViews.firstMatch
+        XCTAssertTrue(runtime.waitForExistence(timeout: 20))
         XCTAssertGreaterThan(runtime.frame.width, 300)
-        XCTAssertTrue(runtime.isHittable)
-        // Loading must complete; this catches bundled integration/script and viewport failures.
-        let skip = app.webViews.buttons["Skip"]
-        if skip.waitForExistence(timeout: 20) { skip.tap() }
-        let grocery = app.webViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Grocery")).firstMatch
-        XCTAssertTrue(grocery.waitForExistence(timeout: 10))
-        grocery.tap()
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Glance live phone preview"
+        screenshot.name = "Glance mirror mode"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+        mode.buttons["Glance on glasses"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["camera-card"].waitForExistence(timeout: 10))
+
         app.buttons["phone-wallet"].tap()
         XCTAssertTrue(app.buttons["wallet-done"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.webViews.textFields.firstMatch.waitForExistence(timeout: 25), "Wallet must load the sign-in/card setup page, not just open an empty sheet")
@@ -29,6 +30,5 @@ final class GlanceUITests: XCTestCase {
         walletShot.name = "Glance wallet setup"; walletShot.lifetime = .keepAlways; add(walletShot)
         app.buttons["wallet-done"].tap()
         XCTAssertTrue(app.buttons["phone-wallet"].waitForExistence(timeout: 10))
-        XCTAssertTrue(runtime.exists, "Closing Wallet returns to the original live runtime")
     }
 }

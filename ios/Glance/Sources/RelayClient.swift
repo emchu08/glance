@@ -1,29 +1,42 @@
 import Foundation
 
-/// Scoped relay client: pairing exchange, demand-aware frame upload (≤768px), handoff pickup.
-/// The phone credential lives in Keychain; it is never a pairing code alone.
+/// Scoped relay client for this phone's long-lived code: pairing, frame upload (≤ glasses
+/// camera resolution), presence, and handoff pickup. The phone credential lives in Keychain.
 actor RelayClient {
     struct UploadResult: Decodable { let ok: Bool; let demand: Bool; let handoffs: [HandoffLink] }
+    struct Status: Decodable { let phone: Bool; let lens: Bool; let frameAgeMs: Int? }
     private let baseURL: URL
-    private var code: String?
+    private let code: String
     private var token: String?
 
-    init(baseURL: URL) { self.baseURL = baseURL; self.code = Keychain.read("glance.pairing.code"); self.token = Keychain.read("glance.pairing.token") }
-
-    func join(code: String) async throws {
-        var req = URLRequest(url: baseURL.appending(path: "/api/relay/pair"))
-        req.httpMethod = "POST"; req.setValue("application/json", forHTTPHeaderField: "content-type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["role": "phone", "code": code])
-        let (data, res) = try await URLSession.shared.data(for: req)
-        guard (res as? HTTPURLResponse)?.statusCode == 200, let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any], let t = obj["token"] as? String else { throw URLError(.badServerResponse) }
-        self.code = code; self.token = t
-        Keychain.write("glance.pairing.token", t)
+    init(baseURL: URL, code: String) {
+        self.baseURL = baseURL
+        self.code = code
+        self.token = Keychain.read("glance.relay.token")
     }
 
-    func forget() { code = nil; token = nil; Keychain.delete("glance.pairing.token") }
+    /// Joins (creating if needed) this phone's pairing. Safe to repeat.
+    func join() async throws {
+        var req = URLRequest(url: baseURL.appending(path: "/api/relay/pair"))
+        req.httpMethod = "POST"; req.setValue("application/json", forHTTPHeaderField: "content-type"); req.timeoutInterval = 8
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["role": "phone", "code": code, "claim": true])
+        let (data, res) = try await URLSession.shared.data(for: req)
+        guard (res as? HTTPURLResponse)?.statusCode == 200, let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any], let t = obj["token"] as? String else { throw URLError(.badServerResponse) }
+        token = t
+        Keychain.write("glance.relay.token", t)
+    }
+
+    func status() async throws -> Status {
+        var components = URLComponents(url: baseURL.appending(path: "/api/relay/status"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "code", value: code)]
+        var req = URLRequest(url: components.url!); req.timeoutInterval = 6; req.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, res) = try await URLSession.shared.data(for: req)
+        guard (res as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode(Status.self, from: data)
+    }
 
     func upload(frame jpeg: Data, width: Int, height: Int) async throws -> UploadResult {
-        guard let code, let token else { throw URLError(.userAuthenticationRequired) }
+        guard let token else { throw URLError(.userAuthenticationRequired) }
         var req = URLRequest(url: baseURL.appending(path: "/api/relay/frame"))
         req.httpMethod = "POST"; req.setValue("application/json", forHTTPHeaderField: "content-type"); req.timeoutInterval = 8
         let body: [String: Any] = ["code": code, "token": token, "image": "data:image/jpeg;base64,\(jpeg.base64EncodedString())", "width": width, "height": height, "capturedAt": Int(Date().timeIntervalSince1970 * 1000)]

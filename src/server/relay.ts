@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHmac, randomBytes } from "node:crypto";
+import { getCache, type RuntimeCache } from "@vercel/functions";
 import { env } from "./env";
 
 /**
@@ -13,7 +14,7 @@ export const PAIR_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 export interface FrameRecord { image: string; width: number; height: number; capturedAt: number; uploadedAt: number }
 export interface HandoffRecord { id: string; code: string; kind: string; title: string; url: string; createdAt: number; expiresAt: number; status: "queued" | "sent"; deliveredAt?: number }
-export interface PairRecord { code: string; createdAt: number; lensSecret: string; phoneSecret: string | null; phoneSeenAt: number | null; demandUntil: number }
+export interface PairRecord { code: string; createdAt: number; lensSecret: string; phoneSecret: string | null; phoneSeenAt: number | null; lensSeenAt?: number | null; demandUntil: number }
 
 interface Backend {
   name: string;
@@ -83,10 +84,43 @@ class UpstashBackend implements Backend {
   async listLen(key: string) { return this.cmd<number>("LLEN", key); }
 }
 
-let backend: Backend | null = null;
+/**
+ * Vercel Runtime Cache: shared by every function instance in the region, so the phone and the
+ * glasses meet even when their requests land on different instances. Not atomic; list operations
+ * are read-modify-write, which is acceptable for a handful of handoff links per pairing.
+ */
+class RuntimeCacheBackend implements Backend {
+  name = "vercel-runtime-cache";
+  private cache: RuntimeCache = getCache({ namespace: "glance-relay" });
+  private async read<T>(key: string): Promise<T | null> {
+    const e = (await this.cache.get(key)) as { v: T; exp: number } | null;
+    return e && e.exp >= Date.now() ? e.v : null;
+  }
+  private async write<T>(key: string, v: T, ttlMs: number) {
+    await this.cache.set(key, { v, exp: Date.now() + ttlMs }, { ttl: Math.max(1, Math.ceil(ttlMs / 1000)), name: "" });
+  }
+  get<T>(key: string) { return this.read<T>(key); }
+  set<T>(key: string, value: T, ttlMs: number) { return this.write(key, value, ttlMs); }
+  async del(key: string) { await this.cache.delete(key); }
+  async popAll<T>(key: string) { const items = (await this.read<T[]>(key)) ?? []; if (items.length) await this.cache.delete(key); return items; }
+  async push<T>(key: string, value: T, ttlMs: number, max: number) {
+    const items = (await this.read<T[]>(key)) ?? [];
+    if (items.length >= max) return -1;
+    items.push(value);
+    await this.write(key, items, ttlMs);
+    return items.length;
+  }
+  async listLen(key: string) { return ((await this.read<unknown[]>(key)) ?? []).length; }
+}
+
+// Held on globalThis: in development each route is bundled separately, and a module-level
+// memory backend would give every route its own relay.
+const holder = globalThis as unknown as { __glanceRelay?: Backend };
 export function relayBackend(): Backend {
-  if (!backend) backend = env.upstashUrl && env.upstashToken ? new UpstashBackend(env.upstashUrl, env.upstashToken) : new MemoryBackend();
-  return backend;
+  holder.__glanceRelay ??= env.upstashUrl && env.upstashToken ? new UpstashBackend(env.upstashUrl, env.upstashToken)
+    : process.env.VERCEL ? new RuntimeCacheBackend()
+    : new MemoryBackend();
+  return holder.__glanceRelay;
 }
 
 const sign = (s: string) => createHmac("sha256", env.relaySecret || "dev-relay").update(s).digest("base64url");
@@ -104,23 +138,34 @@ const kFrame = (c: string) => `glance:frame:${c}`;
 const kHandoffs = (c: string) => `glance:handoffs:${c}`;
 const kHandoff = (id: string) => `glance:handoff:${id}`;
 
-/** Lens creates (or refreshes) a pairing. Returns scoped lens credential. */
-export async function createPairing(existing?: string): Promise<{ code: string; lensToken: string }> {
+const newRecord = (code: string): PairRecord => ({ code, createdAt: Date.now(), lensSecret: secret(), phoneSecret: null, phoneSeenAt: null, lensSeenAt: null, demandUntil: 0 });
+
+/**
+ * Lens creates (or refreshes) a pairing. Returns scoped lens credential.
+ * `claim` keeps the caller's code when it has expired: the glasses web app carries the
+ * phone's long-lived code in its URL, so either side may be first to arrive.
+ */
+export async function createPairing(existing?: string, claim = false): Promise<{ code: string; lensToken: string }> {
   const b = relayBackend();
   if (existing) {
     const p = await b.get<PairRecord>(kPair(existing));
-    if (p) { await b.set(kPair(existing), p, RELAY.pairTtlMs); return { code: p.code, lensToken: sign(`lens:${p.code}:${p.lensSecret}`) }; }
+    if (p) { p.lensSeenAt = Date.now(); await b.set(kPair(existing), p, RELAY.pairTtlMs); return { code: p.code, lensToken: sign(`lens:${p.code}:${p.lensSecret}`) }; }
+    if (claim) {
+      const rec = { ...newRecord(existing), lensSeenAt: Date.now() };
+      await b.set(kPair(existing), rec, RELAY.pairTtlMs);
+      return { code: existing, lensToken: sign(`lens:${existing}:${rec.lensSecret}`) };
+    }
   }
   const code = makeCode();
-  const rec: PairRecord = { code, createdAt: Date.now(), lensSecret: secret(), phoneSecret: null, phoneSeenAt: null, demandUntil: 0 };
+  const rec = newRecord(code);
   await b.set(kPair(code), rec, RELAY.pairTtlMs);
   return { code, lensToken: sign(`lens:${code}:${rec.lensSecret}`) };
 }
 
 /** Phone joins a pairing by code; receives a scoped phone credential. Rate-limited by callers. */
-export async function joinPairing(code: string): Promise<{ phoneToken: string } | null> {
+export async function joinPairing(code: string, create = false): Promise<{ phoneToken: string } | null> {
   const b = relayBackend();
-  const p = await b.get<PairRecord>(kPair(code));
+  const p = (await b.get<PairRecord>(kPair(code))) ?? (create ? newRecord(code) : null);
   if (!p) return null;
   p.phoneSecret = p.phoneSecret ?? secret();
   p.phoneSeenAt = Date.now();
@@ -132,6 +177,29 @@ export async function verifyPhone(code: string, token: string | null): Promise<P
   const p = await relayBackend().get<PairRecord>(kPair(code));
   if (!p || !p.phoneSecret || !token) return null;
   return sign(`phone:${code}:${p.phoneSecret}`) === token ? p : null;
+}
+
+export async function verifyLens(code: string, token: string | null): Promise<PairRecord | null> {
+  const p = await relayBackend().get<PairRecord>(kPair(code));
+  if (!p || !token) return null;
+  return sign(`lens:${code}:${p.lensSecret}`) === token ? p : null;
+}
+
+/**
+ * Sign-in hand-off to the glasses web app, whose browser has its own cookies. The signed-in phone
+ * offers its account for one pairing; the lens holding that pairing's credential may collect it once,
+ * within two minutes.
+ */
+const kGlassesAuth = (c: string) => `glance:glasses-auth:${c}`;
+export const GLASSES_AUTH_TTL_MS = 2 * 60_000;
+export async function offerGlassesSignIn(code: string, user: { id: string; email: string }): Promise<void> {
+  await relayBackend().set(kGlassesAuth(code), user, GLASSES_AUTH_TTL_MS);
+}
+export async function takeGlassesSignIn(code: string): Promise<{ id: string; email: string } | null> {
+  const b = relayBackend();
+  const offer = await b.get<{ id: string; email: string }>(kGlassesAuth(code));
+  if (offer) await b.del(kGlassesAuth(code));
+  return offer;
 }
 
 export async function touchPhone(code: string): Promise<void> {
@@ -158,12 +226,15 @@ export async function getFrame(code: string): Promise<FrameRecord | null> {
   return relayBackend().get<FrameRecord>(kFrame(code));
 }
 
-export async function pairingStatus(code: string): Promise<{ phone: boolean; frameAgeMs: number | null; demand: boolean; backend: string } | null> {
+/** Presence for both ends. `asLens` marks the lens as present, since the lens is what polls. */
+export async function pairingStatus(code: string, asLens = false): Promise<{ phone: boolean; lens: boolean; frameAgeMs: number | null; demand: boolean; backend: string } | null> {
   const b = relayBackend();
   const p = await b.get<PairRecord>(kPair(code));
   if (!p) return null;
+  if (asLens) { p.lensSeenAt = Date.now(); await b.set(kPair(code), p, RELAY.pairTtlMs); }
   const f = await b.get<FrameRecord>(kFrame(code));
-  return { phone: !!p.phoneSeenAt && Date.now() - p.phoneSeenAt < RELAY.presenceTtlMs, frameAgeMs: f ? Date.now() - f.uploadedAt : null, demand: p.demandUntil > Date.now(), backend: b.name };
+  const now = Date.now();
+  return { phone: !!p.phoneSeenAt && now - p.phoneSeenAt < RELAY.presenceTtlMs, lens: !!p.lensSeenAt && now - p.lensSeenAt < RELAY.presenceTtlMs, frameAgeMs: f ? now - f.uploadedAt : null, demand: p.demandUntil > now, backend: b.name };
 }
 
 /** Queue a handoff link (≤ 5 pending, 1 h TTL, duplicate URL/kind collapses to existing). */

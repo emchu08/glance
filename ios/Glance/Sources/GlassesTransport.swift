@@ -21,6 +21,8 @@ protocol GlassesTransport: AnyObject {
     /// Push a rendered 600×600 lens image to the glasses display when supported.
     func startDisplay() async throws
     func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool
+    /// Ends the session so the next connect attaches only what the current mode needs.
+    func reset()
 }
 
 enum GlassesTransportFactory {
@@ -72,6 +74,7 @@ final class PhoneCameraTransport: NSObject, GlassesTransport, AVCaptureVideoData
     func stopCamera() { queue.async { [session] in session.stopRunning() } }
     func startDisplay() async throws {}
     func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool { false }
+    func reset() { stopCamera() }
 
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         // Throttle to ~1 fps for the relay; the lens decides when to analyze.

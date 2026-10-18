@@ -18,8 +18,6 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
     private static let logger = Logger(subsystem: "com.glance.companion", category: "performance")
     @Published private(set) var state: PublishedState?
     @Published private(set) var lastSnapshot: UIImage?
-    @Published private(set) var activityTitle = "Loading Glance…"
-    @Published private(set) var activityDetail = "Your phone and glasses share this view."
     private(set) var webView: WKWebView?
     private(set) var lastFrameAt: Date?
     private var cameraFrame: (jpeg: Data, width: Int, height: Int, at: Date)?
@@ -29,7 +27,6 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
     private var lastSnapshotLog = Date.distantPast
     let sender = LatestFrameSender()
     var onSnapshot: ((UIImage, PublishedState) async -> Bool)?
-    var onPairingCode: ((String) -> Void)?
     var onError: ((String) -> Void)?
     var onWallet: (() -> Void)?
 
@@ -72,10 +69,7 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        Task { @MainActor in
-            if let code = try? await webView.evaluateJavaScript("JSON.parse(localStorage.getItem('glance.pair.v1') || 'null')?.code || ''") as? String, code.count == 6 { onPairingCode?(code) }
-            updateCameraStatus(force: true)
-        }
+        updateCameraStatus(force: true)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -84,25 +78,11 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any] else { return }
-        if body["type"] as? String == "activity" {
-            activityTitle = body["title"] as? String ?? "Ready"
-            activityDetail = body["detail"] as? String ?? ""
-            return
-        }
         guard let data = try? JSONSerialization.data(withJSONObject: body),
               let s = try? JSONDecoder().decode(PublishedState.self, from: data), s != state else { return }
         state = s
         scheduleSnapshot()
-        // Pairing can be created after navigation completes. Read once until discovered.
-        if !paired {
-            Task { @MainActor in
-                if let code = try? await webView?.evaluateJavaScript("JSON.parse(localStorage.getItem('glance.pair.v1') || 'null')?.code || ''") as? String, code.count == 6 {
-                    paired = true; onPairingCode?(code)
-                }
-            }
-        }
     }
-    private var paired = false
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor (Any?, String?) -> Void) {
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == Config.apiBase.host,

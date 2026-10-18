@@ -22,9 +22,11 @@ export default async function LensPage({ searchParams }: { searchParams: Promise
   const screen = dev && typeof sp.screen === "string" ? sp.screen : undefined;
   const source = typeof sp.source === "string" ? sp.source : undefined;
   const grocery = typeof sp.grocery === "string" ? sp.grocery : undefined;
+  // The companion app's long-lived relay code, carried by both the phone lens and the glasses web app.
+  const pair = typeof sp.pair === "string" && /^[A-Z2-9]{6}$/.test(sp.pair) ? sp.pair : undefined;
   return (
     <div style={{ position: "fixed", inset: 0, width: 600, height: 600, background: "#000", overflow: "hidden" }}>
-      <LensRuntime fixtureScreen={screen} source={source} groceryEntry={grocery === "enter"} />
+      <LensRuntime fixtureScreen={screen} source={source} groceryEntry={grocery === "enter"} pairCode={pair} />
     </div>
   );
 }

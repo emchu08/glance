@@ -342,6 +342,11 @@ final class DATTransport: GlassesTransport {
         return true
     }
 
+    func reset() {
+        // Registration is unaffected; only the device session and its capabilities end.
+        disconnect()
+    }
+
     private func stopInputs() {
         inputWait?.finish()
         inputWait = nil
