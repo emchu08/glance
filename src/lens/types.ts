@@ -11,7 +11,7 @@ import type { Quote } from "@/domain/commerce/quote";
 export type ScreenId =
   | "picker" | "online-listings" | "composer" | "more"
   | "glimpse" | "glimpse-candidates" | "glimpse-offers" | "glimpse-cart" | "glimpse-cart-item" | "handoff"
-  | "grocery" | "grocery-item" | "grocery-compare" | "grocery-edit" | "grocery-manual" | "grocery-list"
+  | "grocery" | "grocery-item" | "grocery-compare" | "grocery-edit" | "grocery-list"
   | "grocery-checkout" | "grocery-bought" | "grocery-find"
   | "gourmet" | "gourmet-recipes" | "gourmet-recipe" | "gourmet-steps" | "gourmet-shop" | "gourmet-added"
   | "stores" | "nav" | "wallet" | "wallet-orders" | "wallet-order" | "connect";
@@ -103,7 +103,6 @@ export interface GroceryState {
   bought: { retailer: string; name: string; priceCents: number; url: string }[];
   frameIndex: number;
   storeEntry: { store: string; active: boolean } | null;
-  manualText: string;
   priceText: string;
 }
 
@@ -230,7 +229,6 @@ export type LensEvent =
   | { type: "grocery/frame"; observations: import("@/data/types").GroceryObservation[]; frameIndex: number }
   | { type: "grocery/add-held" }
   | { type: "grocery/dismiss-held" }
-  | { type: "grocery/add-manual"; productKey: string; label: string; packageSize: string | null; unitPriceCents: number | null; source: import("@/data/types").PriceSource }
   | { type: "grocery/add-offer"; offer: Offer }
   | { type: "grocery/confirm-ask"; yes: boolean }
   | { type: "grocery/qty"; productKey: string; delta: 1 | -1 }
@@ -242,7 +240,6 @@ export type LensEvent =
   | { type: "grocery/finish" }
   | { type: "grocery/bought"; retailer: string; name: string; priceCents: number; url: string }
   | { type: "grocery/store-entry"; store: string | null }
-  | { type: "grocery/manual-text"; text: string }
   | { type: "grocery/clear-ack" }
   // list
   | { type: "list/toggle"; key: string }

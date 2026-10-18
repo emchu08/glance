@@ -75,7 +75,7 @@ test("adding starts a 2 s scan cooldown, so the item just added doesn't pop stra
   const before = Date.now();
   let s = groceryAt();
   assert.equal(scanCoolingDown(s, before), false);
-  s = lensReducer(s, { type: "grocery/add-manual", productKey: "bananas-lb", label: "Bananas", packageSize: "per lb", unitPriceCents: 69, source: "catalog" });
+  s = lensReducer(s, { type: "grocery/add-offer", offer: { id: "https://shop.example/bananas", name: "Bananas", retailer: "Target", url: "https://shop.example/bananas", imageUrl: null, priceCents: 69, match: "exact", kind: "external_link", origin: "live" } });
   assert.equal(scanCoolingDown(s, Date.now()), true, "cooling down right after an add");
   assert.equal(scanCoolingDown(s, before + 2_100), false, "over after two seconds");
   s = lensReducer(groceryAt(), { type: "glimpse/save-toggle", offer: { id: "o9", name: "x", retailer: "r", url: "https://example.com", imageUrl: null, priceCents: 100, match: "similar", kind: "external_link", origin: "live" } });
@@ -202,7 +202,7 @@ test("Add to cart from online listings: Grocery's cart in Grocery, the shopping 
 test("reset preserves saved offers, recipes, list and pending payment but clears the physical cart", () => {
   let s = boot();
   s = lensReducer(s, { type: "mode/set", mode: "grocery" });
-  s = lensReducer(s, { type: "grocery/add-manual", productKey: "bananas-lb", label: "Bananas", packageSize: "per lb", unitPriceCents: 69, source: "catalog" });
+  s = lensReducer(s, { type: "grocery/add-offer", offer: { id: "https://shop.example/bananas", name: "Bananas", retailer: "Target", url: "https://shop.example/bananas", imageUrl: null, priceCents: 69, match: "exact", kind: "external_link", origin: "live" } });
   s = lensReducer(s, { type: "glimpse/save-toggle", offer: { id: "o1", name: "x", retailer: "r", url: "https://example.com", imageUrl: null, priceCents: 1, match: "similar", kind: "external_link", origin: "sample" } });
   s = lensReducer(s, { type: "payment/status", status: "pending", orderId: "ord" });
   s = lensReducer(s, { type: "reset" });

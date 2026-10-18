@@ -7,7 +7,7 @@ import {
   ListChecks, LocateFixed, MapPin, Minus, Navigation, Plus, Receipt, ScanLine, ShoppingBag, ShoppingCart, Smartphone, Sparkles, Undo2, UtensilsCrossed, Wallet,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { CATALOG_BY_ID, GROCERY_CATALOG, HOME_STORE, STORES } from "@/data/grocery";
+import { CATALOG_BY_ID, HOME_STORE, STORES } from "@/data/grocery";
 import type { NormalizedBox, Offer } from "@/data/types";
 import { cartTotals } from "@/domain/grocery/cart";
 import { aisleStops, homeStoreStock } from "@/domain/grocery/list";
@@ -45,7 +45,6 @@ export function ScreenBody() {
     case "grocery-item": return <GroceryItem />;
     case "grocery-compare": return <GroceryCompare />;
     case "grocery-edit": return <GroceryEdit />;
-    case "grocery-manual": return <GroceryManual />;
     case "grocery-list": return <GroceryList />;
     case "grocery-checkout": return <GroceryCheckout />;
     case "grocery-bought": return <GroceryBought />;
@@ -640,7 +639,6 @@ function GroceryCart() {
         <Pill id="list" className="h-[76px] flex-1 px-4 text-[25px]" icon={<ListChecks className="size-[26px]" aria-hidden />}>
           List{openList > 0 && <span className="ml-2 tabular-nums" style={{ color: BLUE }}>{openList}</span>}
         </Pill>
-        <Pill id="add" className="h-[76px] flex-1 px-4 text-[25px]" icon={<Plus className="size-[26px]" aria-hidden />} />
         <Pill id="finish" className="h-[76px] flex-[1.4] px-4 text-[25px]" />
       </div>
     </>
@@ -867,37 +865,6 @@ function GroceryEdit() {
         <Pill id="remove" className="flex-1" />
         <Pill id="done" className="flex-1" />
       </BottomRow>
-    </>
-  );
-}
-
-/* ── Grocery: add by name ─────────────────────────────────────────────────── */
-
-function GroceryManual() {
-  const { state, actions } = useLens();
-  const ids = actions.filter((a) => a.listIndex !== undefined).sort((a, b) => a.listIndex! - b.listIndex!).map((a) => a.id);
-  return (
-    <>
-      <p className={clsx("absolute top-[90px] right-11 left-11 text-[34px]", HEADLINE)}>Add an item</p>
-      <div className="absolute top-[142px] right-11 left-11"><LensField id="manual-type" placeholder="Type any item" /></div>
-      <p className="absolute top-[232px] right-11 left-11 text-[20px] text-white/50">Or pick one · sample catalog{state.capture === "sample" ? " · sample prices" : ""}</p>
-      <RowList
-        ids={ids}
-        rowHeight={70}
-        gap={10}
-        top={270}
-        bottom={40}
-        renderRow={(id) => {
-          const product = GROCERY_CATALOG.find((p) => `manual-${p.id}` === id);
-          if (!product) return <QuietRow id={id}><Plus className="size-[26px]" aria-hidden /> Add “{state.grocery.manualText.trim()}”</QuietRow>;
-          return (
-            <Act id={id} className="flex size-full items-center gap-4 rounded-[22px] bg-white/[0.06] px-6 text-left">
-              <span className="min-w-0 flex-1 truncate text-[27px] font-semibold">{product.name} <span className="font-normal text-white/50">· {product.size}</span></span>
-              <span className="text-[26px] font-semibold tabular-nums">{formatCents(product.qfcPriceCents)}</span>
-            </Act>
-          );
-        }}
-      />
     </>
   );
 }
