@@ -79,3 +79,8 @@ Scene imagery in `public/samples/` is procedural placeholder art generated in th
 mode has no runtime image dependency. The photo briefs in the specification (street, sweater, backpack, aisle,
 cart, meal) should be replaced with licensed photography; candidate boxes are positioned to match the placeholders.
 Icons are generated at request time by `/icons/[file]`.
+
+
+## Limitations
+MAKE SURE THE GLASSES AND NEURAL BAND ARE FULLY CHARGED FOR OPTIMAL PERFORMANCE
+
