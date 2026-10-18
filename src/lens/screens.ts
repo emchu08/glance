@@ -1,4 +1,4 @@
-import { CATALOG_BY_ID, GROCERY_CATALOG, STORE_OFFERS, STORES } from "@/data/grocery";
+import { CATALOG_BY_ID, STORE_OFFERS, STORES } from "@/data/grocery";
 import type { Offer } from "@/data/types";
 import { cartTotals } from "@/domain/grocery/cart";
 import { aisleStops } from "@/domain/grocery/list";
@@ -304,9 +304,8 @@ export function describeScreen(state: LensState): LensAction[] {
         row += 1;
       });
       const checkout = gr.cart.length > 0;
-      out.push(act("list", "List", row, checkout ? 0.16 : 0.3, [{ type: "nav/push", screen: { id: "grocery-list" } }]));
-      out.push(act("add", "Add", row, checkout ? 0.45 : 0.7, [{ type: "nav/push", screen: { id: "grocery-manual" } }]));
-      if (checkout) out.push(act("finish", "Check out", row, 0.78, [{ type: "grocery/finish" }], { variant: "primary", effect: { kind: "grocery-exit" } }));
+      out.push(act("list", "List", row, checkout ? 0.28 : 0.5, [{ type: "nav/push", screen: { id: "grocery-list" } }]));
+      if (checkout) out.push(act("finish", "Check out", row, 0.72, [{ type: "grocery/finish" }], { variant: "primary", effect: { kind: "grocery-exit" } }));
       if (gr.undo.length) out.push(act("undo", "Undo", -1, 0.85, [{ type: "grocery/undo" }]));
       out.push(gr.scanning ? act("scan", "Pause scan", -1.5, 0.82, [{ type: "grocery/scan-toggle", on: false }]) : scanAct(state, "scan", "Start scan", -1.5, 0.82, [{ type: "grocery/scan-toggle", on: true }]));
       return out;
@@ -363,16 +362,6 @@ export function describeScreen(state: LensState): LensAction[] {
         ...(priced ? [] : [{ ...act("price", line.unitPriceCents === null ? "Enter price" : formatCents(line.unitPriceCents), 1, 0.5, [{ type: "composer/open", field: `price:${key}`, value: line.unitPriceCents === null ? "" : (line.unitPriceCents / 100).toFixed(2) }]), variant: "row" as const, field: `price:${key}` }]),
         act("remove", "Remove", priced ? 1 : 2, 0.3, [{ type: "grocery/remove", productKey: key }, { type: "nav/back" }]),
       ];
-    }
-    case "grocery-manual": {
-      const text = state.grocery.manualText.trim();
-      const matches = text ? GROCERY_CATALOG.filter((p) => p.name.toLowerCase().includes(text.toLowerCase())) : GROCERY_CATALOG;
-      const typeAction: LensAction = { ...act("manual-type", text || "Type any item", -1, 0.5, [{ type: "composer/open", field: "grocery-manual", value: text }]), variant: "row", field: "grocery-manual" };
-      const custom = text && !matches.some((m) => m.name.toLowerCase() === text.toLowerCase())
-        ? [{ ...act("manual-add-custom", `Add “${text}”`, 0, 0.5, [{ type: "grocery/add-manual", productKey: `custom-${text.toLowerCase().replace(/\s+/g, "-")}`, label: text, packageSize: null, unitPriceCents: null, source: "unknown" }], { variant: "row" }), listIndex: 0 }]
-        : [];
-      const rows = matches.map((p, i) => ({ ...act(`manual-${p.id}`, p.name, i + custom.length, 0.5, [{ type: "grocery/add-manual", productKey: p.id, label: p.name, packageSize: p.size, unitPriceCents: p.qfcPriceCents, source: "catalog" }], { variant: "row", effect: { kind: "persist" } }), listIndex: i + custom.length }));
-      return [...h, typeAction, ...custom, ...rows];
     }
     case "grocery-list": {
       const rows = state.list.map((it, i) => ({ ...act(`list-${it.key}`, it.name, i, 0.5, [{ type: "list/toggle", key: it.key }], { variant: "row", effect: { kind: "persist" }, hint: it.done ? "pressed" : undefined }), listIndex: i }));

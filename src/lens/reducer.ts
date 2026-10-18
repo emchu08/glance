@@ -34,7 +34,6 @@ const BACK_TO: Partial<Record<ScreenId, ScreenId[]>> = {
   "grocery-item": ["grocery"],
   "grocery-compare": ["grocery-item", "grocery"],
   "grocery-edit": ["grocery"],
-  "grocery-manual": ["grocery"],
   "grocery-list": ["grocery"],
   "grocery-checkout": ["grocery"],
   "grocery-bought": ["grocery"],
@@ -337,12 +336,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       const grocery = { ...state.grocery, tracker, pendingAsk, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null, acknowledgement: state.grocery.scanning ? "Rescanning…" : null };
       return root({ ...cooled(state), grocery }, "grocery");
     }
-    case "grocery/add-manual": {
-      const eventId = `${event.productKey}#manual-${Date.now()}`;
-      const cart = addToCart(state.grocery.cart, { productKey: event.productKey, label: event.label, packageSize: event.packageSize, unitPriceCents: event.unitPriceCents, priceSource: event.source, eventId });
-      const grocery = { ...state.grocery, undo: [state.grocery.cart, ...state.grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: event.productKey, acknowledgement: `Added ${event.label}`, manualText: "" };
-      return root({ ...cooled(state), grocery, list: completeListFromCart(state.list, cart) }, "grocery");
-    }
     case "grocery/confirm-ask": {
       const ask = state.grocery.pendingAsk;
       if (!ask) return state;
@@ -398,8 +391,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       return replace({ ...state, grocery: { ...state.grocery, bought: [...state.grocery.bought, { retailer: event.retailer, name: event.name, priceCents: event.priceCents, url: event.url }] } }, { id: "grocery-bought" });
     case "grocery/store-entry":
       return bump({ ...state, grocery: { ...state.grocery, storeEntry: event.store ? { store: event.store, active: true } : null } });
-    case "grocery/manual-text":
-      return bump({ ...state, grocery: { ...state.grocery, manualText: event.text } });
     case "grocery/clear-ack":
       return state.grocery.acknowledgement ? bump({ ...state, grocery: { ...state.grocery, acknowledgement: null } }) : state;
 
@@ -531,7 +522,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       const { field, value } = state.composer;
       const s = bump({ ...state, composer: null });
       if (field === "listings-query") return { ...s, listings: { ...s.listings, query: value.trim() } };
-      if (field === "grocery-manual") return { ...s, grocery: { ...s.grocery, manualText: value.trim() } };
       if (field.startsWith("price:")) return { ...s, grocery: { ...s.grocery, priceText: value.trim() } };
       return s;
     }

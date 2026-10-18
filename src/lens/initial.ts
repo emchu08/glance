@@ -48,7 +48,6 @@ export function initialState(): LensState {
       bought: [],
       frameIndex: 0,
       storeEntry: null,
-      manualText: "",
       priceText: "",
     },
     gourmet: {
