@@ -16,13 +16,12 @@ stream later, on demand, ended it with a critical error on the glasses and took
 the display down with it. If no frame arrives in 10 s the stream restarts once,
 then falls back to Meta's default setup (low, 24 fps).
 
-**Phone:** the glasses camera and the Glance screens **side by side** (camera on the
-left, Glance on the right), never on top of each other. In portrait the Glance side
-is wider so its text stays readable; turn the phone sideways for an even, larger split.
-The Glance side is the same screen the glasses show, so **tapping it drives the
-glasses**: a guide can walk someone through Glance from the phone without the Neural
-Band. Every control on it is tappable, and each tap reaches the display with the
-next screen image sent over Bluetooth. The camera tile updates live (up to 15 a second) whenever the glasses camera
+**Phone:** the Glance screens and the glasses camera, **never on top of each other**.
+In portrait they stack in one column at full width, Glance above the camera; sideways
+they sit side by side. The Glance screen is the same screen the glasses show, so
+**tapping it drives the glasses**: a guide can walk someone through Glance from the
+phone without the Neural Band. Each tap reaches the display with the next screen image
+sent over Bluetooth. The camera tile updates live (up to 15 a second) whenever the glasses camera
 is on. **Details** at the bottom lists the recent connection steps.
 
 There is no glasses web app mode: while the phone streams the glasses camera,

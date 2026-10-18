@@ -2,8 +2,8 @@ import SwiftUI
 import WebKit
 
 /// The phone half of Glance: connects the glasses on launch and draws the Glance screens on them. Their
-/// camera stays on once connected. The phone shows the glasses camera and the Glance
-/// screens side by side; tapping the screens drives the glasses, so a guide can lead without the Neural Band.
+/// camera stays on once connected. The phone shows the Glance screens above the glasses camera
+/// (side by side in landscape); tapping the screens drives the glasses, so a guide can lead without the Neural Band.
 struct LauncherView: View {
     @Environment(AppModel.self) private var model
     private let blue = Color(red: 0.16, green: 0.39, blue: 0.91)
@@ -52,31 +52,25 @@ struct LauncherView: View {
     }
 }
 
-/// The glasses camera and the Glance screens next to each other, never on top of each other.
-/// The screens get the wider share in portrait so their text stays readable; landscape splits evenly.
+/// The Glance screens and the glasses camera, never on top of each other. Portrait stacks them in
+/// one column at full width (Glance above, since it's the one you tap); landscape puts them side by side.
 private struct LiveSplit: View {
     let width: CGFloat
     let landscape: Bool
     let blue: Color
     var body: some View {
         let spacing: CGFloat = 12
-        let cameraSide = ((width - spacing) * (landscape ? 0.5 : 0.42)).rounded(.down)
-        let lensSide = width - spacing - cameraSide
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: spacing) {
-                Panel(title: "Glasses camera", systemImage: "video", blue: blue) {
-                    CameraPreview()
-                }
-                .frame(width: cameraSide)
-                Panel(title: "Glance · tap to control", systemImage: "hand.tap", blue: blue) {
-                    LensRuntimeView().accessibilityIdentifier("live-lens")
-                }
-                .frame(width: lensSide)
+        let side = landscape ? ((width - spacing) / 2).rounded(.down) : width
+        let layout = landscape ? AnyLayout(HStackLayout(alignment: .top, spacing: spacing)) : AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
+        layout {
+            Panel(title: "Glance · tap to control", systemImage: "hand.tap", blue: blue) {
+                LensRuntimeView().accessibilityIdentifier("live-lens")
             }
-            if !landscape {
-                Label("Turn your phone sideways for a bigger view.", systemImage: "rectangle.landscape.rotate")
-                    .font(.caption2).foregroundStyle(.secondary)
+            .frame(width: side)
+            Panel(title: "Glasses camera", systemImage: "video", blue: blue) {
+                CameraPreview()
             }
+            .frame(width: side)
         }
     }
 }
