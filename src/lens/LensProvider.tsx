@@ -7,7 +7,7 @@ import type { CaptureKind, Offer } from "@/data/types";
 import { createNativeAdapter, createSampleAdapter, createWebcamAdapter, type CaptureAdapter } from "./capture";
 import { moveFocus, moveLinear, reconcileFocus, type Direction } from "./navigation";
 import { initialState, lensReducer } from "./reducer";
-import { describeScreen, groceryQuery, isPayable, publishedActions } from "./screens";
+import { describeScreen, groceryQuery, isPayable, publishedActions, scanCoolingDown } from "./screens";
 import { loadPersisted, savePersisted, PAIR_KEY, PHONE_CODE_KEY } from "./storage";
 import * as svc from "./services";
 import type { LensAction, LensEffect, LensEvent, LensState, OrderSummary } from "./types";
@@ -233,6 +233,11 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
   };
   const lastNativeFrameAt = useRef(0);
   const lastFrame = useRef<svc.Frame | null>(null);
+  /** Waits out the scan cooldown that follows an add to cart (at most two seconds). */
+  const coolDown = useCallback(async () => {
+    const wait = (stateRef.current.scanCooldownUntil ?? 0) - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  }, []);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const purchaseInFlight = useRef<string | null>(null);
 
@@ -259,6 +264,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const c = begin("glimpse");
         (async () => {
           try {
+            await coolDown();
+            if (c.signal.aborted) return;
             const frame = await adapter.capture("glimpse", s.glimpse.frameIndex, { fresh: true, after: lastNativeFrameAt.current });
             if (frame.origin === "native") lastNativeFrameAt.current = frame.capturedAt;
             lastFrame.current = frame;
@@ -299,6 +306,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const c = begin("gourmet");
         (async () => {
           try {
+            await coolDown();
+            if (c.signal.aborted) return;
             const frame = await adapter.capture("gourmet", 0, { fresh: true, after: lastNativeFrameAt.current });
             if (frame.origin === "native") lastNativeFrameAt.current = frame.capturedAt;
             lastFrame.current = frame;
@@ -527,7 +536,7 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         : "pending";
       dispatch({ type: "payment/status", status, orderId: o.id, order: o, error: status === "error" ? "Card declined" : undefined });
     }
-  }, [dispatch, fixture, log]);
+  }, [dispatch, fixture, log, coolDown]);
 
   // ── Grocery sampler: 3 s, single in-flight, drops busy ticks ──────────────
   const groceryBusy = useRef(false);
@@ -536,7 +545,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     const session = effectiveState.session;
     let cancelled = false;
     const tick = async () => {
-      if (cancelled || groceryBusy.current || !visible.current) return;
+      // Just added something: skip scans for two seconds so it doesn't pop straight back up.
+      if (cancelled || groceryBusy.current || !visible.current || scanCoolingDown(stateRef.current, Date.now())) return;
       groceryBusy.current = true;
       const s = stateRef.current;
       const c = begin("grocery");
@@ -547,6 +557,8 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const r = await svc.recognizeGroceryFrame(frame, s.grocery.cart.map((l) => l.label), c.signal);
         setDiag((d) => ({ ...d, frames: d.frames + 1, lastLatencyMs: Math.round(performance.now() - t0) }));
         if (cancelled || stateRef.current.session !== session) return;
+        // A frame taken before an add would still show the item in hand: drop it.
+        if (scanCoolingDown(stateRef.current, Date.now())) return;
         const before = stateRef.current.grocery.cart.reduce((n, l) => n + l.quantity, 0);
         dispatch({ type: "grocery/frame", observations: r.observations, frameIndex: s.grocery.frameIndex + 1 });
         queueMicrotask(() => {

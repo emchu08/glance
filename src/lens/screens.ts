@@ -5,6 +5,7 @@ import { aisleStops } from "@/domain/grocery/list";
 import { storesByDistance, walkingDirectionsUrl } from "@/domain/grocery/stores";
 import { paginateSteps, scaleIngredients } from "@/domain/gourmet/list";
 import { formatCents } from "@/domain/money";
+import { onlineLineKey } from "./reducer";
 import { MODE_META, type LensAction, type LensState, type Mode, type Screen } from "./types";
 
 /**
@@ -131,9 +132,12 @@ function demoBuy(state: LensState, offer: Offer, label: string, id = "buy", row 
   return act(id, label, row, x, [{ type: "payment/demo-start", offerId: offer.id, originMode: state.mode, attemptKey }], { variant: "pay", effect: { kind: "demo-purchase", offerId: offer.id, attemptKey } });
 }
 
+/** Add to cart: Grocery's own cart in Grocery (at the listing's price), the shopping cart in Glimpse and Gourmet. */
 function cartAdd(state: LensState, offer: Offer | null): LensAction {
-  const inCart = !!offer && state.glimpse.saved.some((s) => s.id === offer.id);
-  return act("cart-add", inCart ? "In cart" : state.mode === "glimpse" ? "Add to cart" : "Save", 2, 0.66, offer && !inCart ? [{ type: "glimpse/save-toggle", offer }] : [], { effect: inCart ? undefined : { kind: "persist" }, hint: inCart ? "pressed" : undefined });
+  const grocery = state.mode === "grocery";
+  const inCart = !!offer && (grocery ? state.grocery.cart.some((l) => l.productKey === onlineLineKey(offer.id)) : state.glimpse.saved.some((s) => s.id === offer.id));
+  const events: LensAction["events"] = !offer || inCart ? [] : grocery ? [{ type: "grocery/add-offer", offer }] : [{ type: "glimpse/save-toggle", offer }];
+  return act("cart-add", inCart ? "In cart" : "Add to cart", 2, 0.66, events, { effect: inCart ? undefined : { kind: "persist" }, hint: inCart ? "pressed" : undefined });
 }
 
 function paymentActions(state: LensState): LensAction[] {
@@ -512,3 +516,8 @@ export function publishedActions(actions: LensAction[], rects: { id: string; x: 
   }));
 }
 export type { Screen };
+
+/** True for two seconds after anything was added to a cart: scans wait, so the item just added doesn't pop back up. */
+export function scanCoolingDown(state: LensState, now: number): boolean {
+  return (state.scanCooldownUntil ?? 0) > now;
+}

@@ -162,6 +162,8 @@ export interface HandoffState {
 }
 
 export interface LensState {
+  /** After anything is added to a cart, scans pause until this time (ms), so the same item doesn't pop straight back up. */
+  scanCooldownUntil?: number;
   mode: Mode;
   capture: CaptureKind;
   screen: Screen;
@@ -223,6 +225,7 @@ export type LensEvent =
   | { type: "grocery/frame"; observations: import("@/data/types").GroceryObservation[]; frameIndex: number }
   | { type: "grocery/add-held" }
   | { type: "grocery/add-manual"; productKey: string; label: string; packageSize: string | null; unitPriceCents: number | null; source: import("@/data/types").PriceSource }
+  | { type: "grocery/add-offer"; offer: Offer }
   | { type: "grocery/confirm-ask"; yes: boolean }
   | { type: "grocery/qty"; productKey: string; delta: 1 | -1 }
   | { type: "grocery/remove"; productKey: string }
