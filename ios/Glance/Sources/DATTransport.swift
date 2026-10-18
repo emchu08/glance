@@ -221,8 +221,7 @@ final class DATTransport: GlassesTransport {
         onCameraStatus?("off until you scan")
     }
 
-    /// Streams until `pauseCamera`. If no frame arrives in 10 s, restarts the stream once, then
-    /// moves to the next camera setup.
+    /// Streams until `pauseCamera`, however slowly frames arrive: it never stops or swaps the stream itself.
     func resumeCamera() async throws {
         if camera == nil { try await startCamera() }
         guard let capability = camera, !cameraStreaming else { return }
@@ -230,7 +229,7 @@ final class DATTransport: GlassesTransport {
         cameraFramesReceived = 0
         onCameraStatus?("starting (\(Self.cameraConfigs[cameraConfigIndex].label))")
         capability.stream.start()
-        armCameraWatchdog(capability, restarted: false)
+        armCameraWatchdog(capability)
     }
 
     func pauseCamera() {
@@ -308,35 +307,14 @@ final class DATTransport: GlassesTransport {
         }
     }
 
-    private func armCameraWatchdog(_ capability: Camera, restarted: Bool) {
+    /// Says so when no picture has arrived after 10 s, but leaves the stream running: a slow camera keeps going.
+    private func armCameraWatchdog(_ capability: Camera) {
         cameraWatchdog?.cancel()
         cameraWatchdog = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(10)) } catch { return }
             guard let self, self.camera === capability, self.cameraStreaming, self.cameraFramesReceived == 0 else { return }
-            if !restarted {
-                // Once: stop and start the same stream.
-                self.onCameraStatus?("no picture yet; restarting the stream")
-                capability.stream.stop()
-                capability.stream.start()
-                self.armCameraWatchdog(capability, restarted: true)
-                return
-            }
-            await self.nextCameraSetup()
+            self.onCameraStatus?("no picture yet; still waiting")
         }
-    }
-
-    private func nextCameraSetup() async {
-        let next = cameraConfigIndex + 1
-        stopCamera()
-        guard next < Self.cameraConfigs.count, let session else {
-            onCameraStatus?("no picture from the glasses camera")
-            onError?("The glasses camera isn’t sending pictures. Check the glasses are on your face and not too warm, then tap Reconnect.")
-            return
-        }
-        do {
-            try await prepareCamera(on: session, config: next)
-            try await resumeCamera()
-        } catch { onError?(error.localizedDescription) }
     }
 
     private static func describe(_ state: StreamState) -> String {

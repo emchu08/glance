@@ -102,12 +102,13 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
                 updateCameraStatus(force: true)
             }
             Task { @MainActor in
-                // The camera may be just turning on: wait for a fresh frame, never return an old one.
+                // Wait up to 12 s for a fresh frame; a slow camera that sends none in time still scans its newest one.
                 let deadline = ContinuousClock.now.advanced(by: .seconds(12))
                 while (cameraFrame == nil || Date().timeIntervalSince(cameraFrame!.at) > 2), ContinuousClock.now < deadline {
                     try? await Task.sleep(for: .milliseconds(50))
                 }
-                guard let frame = cameraFrame, Date().timeIntervalSince(frame.at) <= 2 else {
+                if cameraStarting, cameraFrame != nil { cameraStarting = false; updateCameraStatus(force: true) }
+                guard let frame = cameraFrame else {
                     if cameraStarting { cameraStarting = false; updateCameraStatus(force: true) }
                     replyHandler(nil, cameraStandby ? "The glasses camera didn’t turn on. Try again, or tap Reconnect on your phone." : "The glasses camera is off. Connect your glasses in the Glance app on your phone."); return
                 }
