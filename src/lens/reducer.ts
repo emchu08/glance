@@ -502,6 +502,12 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       return bump({ ...state, payment: { ...state.payment, status: "pending", attemptKey: event.attemptKey, error: null } });
     case "payment/status":
       return bump({ ...state, payment: { ...state.payment, status: event.status, orderId: event.orderId ?? state.payment.orderId, order: event.order === undefined ? state.payment.order : event.order, error: event.error ?? null } });
+    case "payment/demo-start":
+      if (state.payment.status === "pending") return state; // prevents repeated submission
+      return bump({ ...state, payment: { status: "pending", offerId: event.offerId, quote: null, orderId: null, order: null, error: null, attemptKey: event.attemptKey, originMode: event.originMode, demo: true } });
+    case "payment/phone-link":
+      if (!state.payment.demo) return state; // a link for a payment the wearer already dismissed
+      return bump({ ...state, payment: { ...state.payment, phoneLink: event.status } });
     case "payment/clear": {
       const originMode = state.payment.originMode ?? state.mode;
       const cleared = { ...state, payment: { ...emptyLens().payment } };
