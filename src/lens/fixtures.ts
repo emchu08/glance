@@ -47,7 +47,7 @@ function order(status: OrderSummary["paymentStatus"], fulfillment: OrderSummary[
 }
 
 export function fixtureState(id: string, live: boolean, base: LensState): LensState {
-  const s: LensState = { ...base, intro: "done", capture: live ? "webcam" : "sample", wallet: { ...base.wallet, status: "unknown" } };
+  const s: LensState = { ...base, capture: live ? "webcam" : "sample", wallet: { ...base.wallet, status: "unknown" } };
   const offers = live ? liveOffers() : sampleOffersForLabel("Gray crewneck sweater", "gray-sweater");
   const withOffers = (list: Offer[], status: LensState["glimpse"]["offersStatus"]): LensState => ({
     ...s, mode: "glimpse", screen: { id: "glimpse-offers" }, stack: [{ id: "glimpse" }],

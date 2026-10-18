@@ -36,11 +36,9 @@ const fs = require('node:fs');
     const lensText = () => page.evaluate(() => document.querySelector('.lens').innerText);
     const count = (text, phrase) => text.split(phrase).length - 1;
 
-    // The companion opens on the Welcome intro, then the picker, with the glasses camera's status, never a pair code.
-    await page.waitForSelector('[data-screen="welcome"]');
-    await page.screenshot({ path: '/tmp/glance-welcome.png' });
-    await page.locator('[data-action-id="skip"]').click();
+    // The companion opens straight on the picker (no intro), with the glasses camera's status, never a pair code.
     await page.waitForSelector('[data-screen="picker"]');
+    assert.equal(await page.locator('[data-action-id="skip"]').count(), 0, 'No intro or Skip');
     await page.waitForFunction(() => document.querySelector('.lens').innerText.includes('Starting the glasses camera'));
     assert.ok(!/pair code/i.test(await lensText()), 'No relay pair code inside the companion');
     await page.evaluate(() => { window.frameAvailable = true; window.glanceCompanion.camera({ ready: true }); });
@@ -102,6 +100,6 @@ const fs = require('node:fs');
     await page.locator('[data-action-id="w-setup"]').click();
     assert.ok(await page.evaluate(() => window.nativeMessages.some(m => m.type === 'wallet')), 'Wallet handoff opens the phone sheet');
     assert.deepEqual(errors, []);
-    console.log('PASS: welcome intro then picker, no pair code, camera status in the lens, Grocery says each thing once, camera-drop message, fresh native capture, pause, visible focus ring, listing error/empty, wallet handoff, no browser errors.');
+    console.log('PASS: opens on the picker with no intro, no pair code, camera status in the lens, Grocery says each thing once, camera-drop message, fresh native capture, pause, visible focus ring, listing error/empty, wallet handoff, no browser errors.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

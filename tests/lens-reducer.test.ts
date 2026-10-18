@@ -9,7 +9,7 @@ import { SAMPLE_GROCERY_PLAYBACK } from "../src/data/grocery.ts";
 import { rankCandidates } from "../src/domain/glimpse/interest.ts";
 import { STREET_CANDIDATES } from "../src/data/glimpse.ts";
 
-const boot = (): LensState => lensReducer(initialState(), { type: "init", skipIntro: true });
+const boot = (): LensState => lensReducer(initialState(), { type: "init" });
 
 test("mode switch keeps shopping state and cancels stale scans; stale results are ignored", () => {
   let s = boot();
@@ -72,7 +72,7 @@ test("every fixture describes a screen with reachable header and at least one en
       const ids = new Set(actions.map((a) => a.id));
       assert.equal(ids.size, actions.length, `${id}: action ids are unique`);
       // D-pad can reach the header from the default focus.
-      if (s.screen.id !== "picker" && s.screen.id !== "welcome") {
+      if (s.screen.id !== "picker") {
         let cur = defaultFocus(actions);
         for (let i = 0; i < 14 && cur && !cur.startsWith("hdr-"); i += 1) cur = moveFocus(actions, cur, "up");
         assert.ok(cur?.startsWith("hdr-"), `${id}: header reachable with Up`);

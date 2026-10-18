@@ -1,27 +1,28 @@
 # Glance iPhone companion
 
 The companion uses Meta Wearables DAT **1.0.1** with Meta Ray-Ban Display. It
-connects to the glasses on launch (there is no start button) and starts the
-glasses camera first. **Wallet** opens account/card setup.
+connects to the glasses on launch (there is no start button). The phone always
+shows the Glance screens; the glasses camera only feeds recognition and its
+picture is never shown. The lens opens directly on the mode picker. **Wallet**
+opens account/card setup.
 
 ## Two ways to show Glance on the glasses
 
-**Glance on glasses (default, smooth).** The lens runs as a Meta Ray-Ban Display
-*Web App*, rendered by the glasses themselves at their own frame rate. Web Apps
-cannot use the camera, so the phone streams the glasses camera (DAT, camera only)
-to the relay twice a second and the web app reads frames from there. The phone
-has one long-lived relay code, built into the web app's address, so nothing is
-typed per session. One-time setup, shown on the phone with a Copy button:
-Meta AI → Developer Mode → App Settings → Web Apps → Connect Web App → paste the
-address → open Glance from the glasses' app grid and pin it. The phone shows a
-live view of the glasses camera and whether Glance is open on the glasses. When
-the phone is signed in, it hands the account to the glasses once (single use,
-two minutes) so Buy works there; the glasses browser keeps its own cookies.
+**Same as phone (default).** The glasses show the same Glance screens as the
+phone, with no setup. The display connects first and the camera joins behind it,
+so the screens never give way to the camera. Each changed screen is a full
+600×600 image over Bluetooth, so motion is limited by Bluetooth; unchanged
+screens are never resent.
 
-**Mirror phone (fallback).** The phone renders the lens and sends each changed
-screen to the display over Bluetooth (DAT display + inputs). Every update is a
-full 600×600 image, so this is limited by Bluetooth, not by the app; unchanged
-screens are never resent. The phone's lens is covered until the camera is live.
+**Glasses web app (smoother, one-time setup).** The lens runs as a Meta Ray-Ban
+Display *Web App*, rendered by the glasses at their own frame rate. Web Apps
+cannot use the camera, so the phone streams the glasses camera (DAT, camera only)
+to the relay twice a second and the web app reads frames from there, under the
+phone's long-lived relay code carried in the web app's address. Setup, shown on
+the phone with a Copy button: Meta AI → Developer Mode → App Settings → Web Apps →
+Connect Web App → paste the address → open Glance from the glasses' app grid.
+When the phone is signed in, it hands the account to the glasses once (single
+use, two minutes) so Buy works there.
 
 Not yet verified on hardware: whether DAT camera streaming continues while a
 Web App is in the foreground on the glasses. If it does not, use Mirror phone.

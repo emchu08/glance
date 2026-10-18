@@ -38,16 +38,16 @@ final class AppModel {
         }
     }
 
-    /// Where the lens runs. The glasses web app renders on the glasses at their own frame rate;
-    /// mirroring renders on the phone and sends each changed screen over Bluetooth.
+    /// Where the lens runs. Mirroring (the default) shows the phone's screens on the glasses with no
+    /// setup. The glasses web app renders on the glasses themselves and needs a one-time Meta AI setup.
     enum GlassesMode: String, CaseIterable, Identifiable {
-        case webApp, mirror
+        case mirror, webApp
         var id: String { rawValue }
-        var title: String { self == .webApp ? "Glance on glasses" : "Mirror phone" }
+        var title: String { self == .webApp ? "Glasses web app" : "Same as phone" }
         var detail: String {
             self == .webApp
-                ? "Runs on the glasses, smooth. Your phone supplies the camera."
-                : "Runs on the phone and sends each screen over Bluetooth. Slower."
+                ? "Runs on the glasses for smoother motion. Needs a one-time setup in Meta AI."
+                : "The glasses show the same Glance screens as this phone. No setup."
         }
     }
 
@@ -57,17 +57,17 @@ final class AppModel {
     var history: [HandoffLink] = []
     let apiBase: URL = Config.apiBase
     var lastFrameAt: Date?
-    var lastFrameImage: UIImage?
     var glassesAppOpen = false
     var developerLog: [String] = []
     var errorMessage: String?
     var launchStatus = "Connecting to your glasses…"
     var showWallet = false
     var isLaunching = false
-    var mode: GlassesMode = GlassesMode(rawValue: UserDefaults.standard.string(forKey: "glance.glassesMode") ?? "") ?? .webApp
+    var mode: GlassesMode = GlassesMode(rawValue: UserDefaults.standard.string(forKey: AppModel.modeKey) ?? "") ?? .mirror
+    /// v2: earlier builds defaulted to the web app, which shows nothing on the glasses until it is set up.
+    private static let modeKey = "glance.glassesMode.v2"
     private var uploading = false
     private var lastUpload = Date.distantPast
-    private var lastPreview = Date.distantPast
     private var cameraHealth: Task<Void, Never>?
     private var relayWatch: Task<Void, Never>?
     private var wantsLaunch = false
@@ -111,10 +111,6 @@ final class AppModel {
             let now = Date()
             self.lastFrameAt = now
             self.lensBridge.receiveFrame(jpeg, width: w, height: h)
-            if now.timeIntervalSince(self.lastPreview) >= 0.4 {
-                self.lastPreview = now
-                self.lastFrameImage = UIImage(data: jpeg)
-            }
             // The glasses web app reads frames from the relay; mirroring needs it only for link handoffs.
             let interval: TimeInterval = self.mode == .webApp ? 0.4 : 1
             guard !self.uploading, now.timeIntervalSince(self.lastUpload) >= interval else { return }
@@ -173,16 +169,19 @@ final class AppModel {
         continuingLaunch = true
         defer { continuingLaunch = false }
         do {
-            launchStatus = "Starting the glasses camera…"
-            try await transport.startCamera()
-            guard wantsLaunch else { return }
+            // The screens reach the glasses first; the camera joins behind them and never replaces them.
             if mode == .mirror {
                 launchStatus = "Showing Glance on your glasses…"
                 try await lensBridge.waitUntilReady()
                 guard wantsLaunch else { return }
                 try await transport.startDisplay()
                 lensBridge.refresh()
+                guard wantsLaunch else { return }
             }
+            launchStatus = "Starting the glasses camera…"
+            try await transport.startCamera()
+            guard wantsLaunch else { return }
+            lensBridge.refresh()
             registrationDeadline?.cancel()
             launchStatus = mode == .webApp ? "Camera connected." : "Glance is open on your glasses."
             isLaunching = false
@@ -193,7 +192,7 @@ final class AppModel {
     func setMode(_ next: GlassesMode) {
         guard next != mode else { return }
         mode = next
-        UserDefaults.standard.set(next.rawValue, forKey: "glance.glassesMode")
+        UserDefaults.standard.set(next.rawValue, forKey: AppModel.modeKey)
         log("mode → \(next.rawValue)")
         // Display and controls belong to whichever side renders the lens; start the session again.
         transport.reset()

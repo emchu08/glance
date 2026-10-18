@@ -23,7 +23,7 @@ export function Lens({ interactive = true, scale = 1, instant = false, className
 
   const header = actions.filter((a) => a.row === 0);
   const bottom = actions.filter((a) => a.row === ACTION_ROW);
-  const showHeader = state.screen.id !== "welcome" && state.screen.id !== "picker" && !state.composer;
+  const showHeader = state.screen.id !== "picker" && !state.composer;
 
   return (
     <div

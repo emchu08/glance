@@ -65,7 +65,6 @@ function Stage() {
                   else if (state.mode === "glimpse") scanning ? dispatch({ type: "glimpse/scan-cancel" }) : runEffect({ kind: "glimpse-scan" });
                   else scanning ? dispatch({ type: "gourmet/scan-cancel" }) : runEffect({ kind: "gourmet-scan" });
                 })}
-                {ctl("Replay intro", () => dispatch({ type: "nav/replace", screen: { id: "welcome" } }))}
                 {ctl("Reset scenario", () => dispatch({ type: "reset" }))}
                 {ctl(state.grocery.storeEntry?.active ? "Simulate leaving store" : "Simulate store entry", () => dispatch({ type: "grocery/store-entry", store: state.grocery.storeEntry?.active ? null : "QFC" }))}
                 {ctl(showDiag ? "Hide diagnostics" : "Diagnostics", () => setShowDiag((d) => !d))}

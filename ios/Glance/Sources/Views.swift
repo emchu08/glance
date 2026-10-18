@@ -1,8 +1,8 @@
 import SwiftUI
 import WebKit
 
-/// The phone half of Glance: connects the glasses camera on launch, then either hands the
-/// lens to the glasses web app or mirrors the phone's lens onto the display.
+/// The phone half of Glance: connects the glasses on launch and always shows the Glance screens.
+/// The glasses camera only feeds recognition; its picture is never shown here.
 struct LauncherView: View {
     @Environment(AppModel.self) private var model
     private let blue = Color(red: 0.16, green: 0.39, blue: 0.91)
@@ -23,15 +23,16 @@ struct LauncherView: View {
                         }.accessibilityIdentifier("phone-wallet")
                     }.foregroundStyle(blue)
 
+                    LensRuntimeView()
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .accessibilityIdentifier("live-lens")
+
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        VStack(alignment: .leading, spacing: 18) {
-                            if model.mode == .webApp {
-                                CameraCard(blue: blue)
-                                GlassesAppCard(blue: blue)
-                            } else {
-                                MirrorLens(blue: blue)
-                            }
+                        VStack(alignment: .leading, spacing: 14) {
+                            ConnectionLine(blue: blue)
                             ConnectionCard(blue: blue)
+                            if model.mode == .webApp { GlassesAppCard(blue: blue) }
                         }
                     }
 
@@ -64,33 +65,18 @@ struct LauncherView: View {
     }
 }
 
-/// What the glasses camera sees right now, from the same frames Glance recognizes.
-private struct CameraCard: View {
+/// One quiet line of connection status under the lens; it never covers the screens.
+private struct ConnectionLine: View {
     @Environment(AppModel.self) private var model
     let blue: Color
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 20).fill(Color(red: 0.06, green: 0.09, blue: 0.14))
-            if let image = model.lastFrameImage, model.cameraLive {
-                Image(uiImage: image).resizable().scaledToFill()
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-            } else {
-                VStack(spacing: 12) {
-                    ProgressView().tint(.white)
-                    Text(model.errorMessage == nil ? model.launchStatus : "Glasses camera not connected")
-                        .font(.callout).foregroundStyle(.white.opacity(0.85))
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            Label(model.cameraLive ? "Glasses camera · live" : "Glasses camera", systemImage: model.cameraLive ? "video.fill" : "video.slash")
-                .font(.footnote.weight(.semibold)).foregroundStyle(.white)
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(.black.opacity(0.45), in: Capsule())
-                .padding(12)
+        HStack(spacing: 8) {
+            if model.isLaunching { ProgressView().controlSize(.small) }
+            Label(model.cameraLive ? "Glasses connected · camera on" : model.launchStatus,
+                  systemImage: model.cameraLive ? "eyeglasses" : "antenna.radiowaves.left.and.right")
         }
-        .aspectRatio(4 / 3, contentMode: .fit)
-        .clipped()
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("camera-card")
+        .font(.footnote).foregroundStyle(blue)
+        .accessibilityIdentifier("launch-status")
     }
 }
 
@@ -131,28 +117,6 @@ private struct GlassesAppCard: View {
         }
         .padding(16)
         .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
-    }
-}
-
-/// Mirror mode: the phone's lens, covered until the glasses camera is actually live.
-private struct MirrorLens: View {
-    @Environment(AppModel.self) private var model
-    let blue: Color
-    var body: some View {
-        ZStack {
-            LensRuntimeView()
-                .accessibilityIdentifier("live-lens")
-            if !model.cameraLive {
-                Color.black.opacity(0.82)
-                VStack(spacing: 12) {
-                    if model.errorMessage == nil { ProgressView().tint(.white) }
-                    Text(model.errorMessage == nil ? model.launchStatus : "Glasses not connected")
-                        .font(.callout).foregroundStyle(.white)
-                }
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 

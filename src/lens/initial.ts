@@ -6,7 +6,8 @@ export function initialState(): LensState {
   return {
     mode: "glimpse",
     capture: "sample",
-    screen: { id: "welcome" },
+    // The lens opens on the mode picker; there is no intro.
+    screen: { id: "picker" },
     stack: [],
     focusId: null,
     windowStart: 0,
@@ -73,6 +74,5 @@ export function initialState(): LensState {
     toast: null,
     composer: null,
     location: { ...DEMO_LOCATION, source: "demo" },
-    intro: "pending",
   };
 }

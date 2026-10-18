@@ -106,7 +106,7 @@ export function StatusLine() {
     case "wallet": body = <><span>Payments by Stripe · sandbox</span><span>{state.wallet.email ?? ""}</span></>; break;
     default:
       if (listCount > LIST_WINDOW) body = <Position count={listCount} note={sampleNote} />;
-      else if (sampleNote && !["welcome", "picker"].includes(s.id)) body = <><span>{sampleNote}</span><span /></>;
+      else if (sampleNote && s.id !== "picker") body = <><span>{sampleNote}</span><span /></>;
   }
   if (!body) return null;
   return <div className="lens-status" aria-live="polite">{body}</div>;
@@ -132,7 +132,6 @@ export function ScreenBody() {
   const { state } = useLens();
   if (state.composer) return <Composer />;
   switch (state.screen.id) {
-    case "welcome": return <Welcome />;
     case "picker": return <Picker />;
     case "more": return <Rows />;
     case "glimpse": return <GlimpseRoot />;
@@ -164,25 +163,7 @@ export function ScreenBody() {
   }
 }
 
-// ── Welcome & picker ─────────────────────────────────────────────────────────
-
-function Welcome() {
-  const { state } = useLens();
-  const reduced = state.reducedMotion;
-  return (
-    <div className="lens-welcome">
-      <div>
-        <div className="lens-welcome-kicker">Welcome to</div>
-        <div className="lens-wordmark" aria-label="glance">
-          glance
-          {!reduced && <motion.span className="is-mask" initial={{ scaleX: 1 }} animate={{ scaleX: 0 }} transition={{ delay: 0.4, duration: 2.5, ease: "linear" }} aria-hidden />}
-          <motion.span className="lens-scanbar" initial={reduced ? { left: "100%" } : { left: "0%" }} animate={{ left: "100%" }} transition={reduced ? { duration: 0 } : { delay: 0.4, duration: 2.5, ease: "linear" }} aria-hidden />
-        </div>
-        <motion.div className="lens-welcome-tag" initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: reduced ? 0 : 2.9, duration: 0.4 }}>Buy with your eyes.</motion.div>
-      </div>
-    </div>
-  );
-}
+// ── Picker ───────────────────────────────────────────────────────────────────
 
 function Picker() {
   const { actions, focusId, activate, state } = useLens();

@@ -56,7 +56,6 @@ export interface LensProviderProps {
   /** Deterministic fixture mode: effects disabled, timers disabled. */
   fixture?: boolean;
   initial?: Partial<LensState> | ((s: LensState) => LensState);
-  skipIntro?: boolean;
   /** A relay code to use instead of minting one (the companion app's code, from the URL). */
   pairCode?: string;
   onLog?: (line: string) => void;
@@ -66,21 +65,17 @@ interface CompanionCamera { ready: boolean; message?: string }
 /** Present when the iPhone companion injected its bridge (before any page script ran). */
 const companionBridge = () => (typeof window === "undefined" ? null : (window as unknown as { glanceCompanion?: { cameraState?: CompanionCamera } }).glanceCompanion ?? null);
 
-const WELCOME_HANDOFF_MS = 3900;
-const WELCOME_REDUCED_MS = 2200;
-const WELCOME_ESCAPE_MS = 6000;
 const GROCERY_INTERVAL_MS = 3000;
 const TOAST_MS = 2200;
 const ORDER_POLL_MS = 1500;
 const ORDER_POLL_MAX_MS = 90_000;
 
-export function LensProvider({ children, capture = "sample", fixture = false, initial, skipIntro, pairCode, onLog }: LensProviderProps) {
+export function LensProvider({ children, capture = "sample", fixture = false, initial, pairCode, onLog }: LensProviderProps) {
   const [state, rawDispatch] = useReducer(lensReducer, undefined, () => {
     let s = initialState();
     s.capture = capture;
     if (typeof initial === "function") s = initial(s);
     else if (initial) s = { ...s, ...initial };
-    if (skipIntro || fixture) s = { ...s, intro: "done", screen: s.screen.id === "welcome" ? { id: "picker" } : s.screen };
     return s;
   });
   const stateRef = useRef(state);
@@ -202,15 +197,6 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     mq.addEventListener("change", h);
     return () => mq.removeEventListener("change", h);
   }, [dispatch, capture]);
-
-  // ── Welcome timer (only the interactive lens drives it) ────────────────────
-  useEffect(() => {
-    if (fixture || effectiveState.intro === "done") return;
-    const ms = effectiveState.reducedMotion ? WELCOME_REDUCED_MS : WELCOME_HANDOFF_MS;
-    const t = setTimeout(() => dispatch({ type: "intro/done" }), ms);
-    const escape = setTimeout(() => dispatch({ type: "intro/done" }), WELCOME_ESCAPE_MS);
-    return () => { clearTimeout(t); clearTimeout(escape); };
-  }, [fixture, effectiveState.intro, effectiveState.reducedMotion, dispatch]);
 
   // ── Toast auto-clear ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -543,11 +529,11 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
     runEffect({ kind: "grocery-insight", productKey: key, label: effectiveState.grocery.heldLabel ?? key, packageSize: effectiveState.grocery.heldSize });
   }, [effectiveState.screen, effectiveState.grocery.heldLabel, effectiveState.grocery.heldSize, runEffect]);
 
-  // Wallet status on first interaction after intro.
+  // Wallet status as soon as the lens opens.
   useEffect(() => {
-    if (fixture || effectiveState.intro !== "done" || effectiveState.wallet.status !== "unknown") return;
+    if (fixture || effectiveState.wallet.status !== "unknown") return;
     runEffect({ kind: "wallet-refresh" });
-  }, [fixture, effectiveState.intro, effectiveState.wallet.status, runEffect]);
+  }, [fixture, effectiveState.wallet.status, runEffect]);
 
   // Auto-quote eligible offers when they become visible (so Buy $X shows the server total).
   useEffect(() => {

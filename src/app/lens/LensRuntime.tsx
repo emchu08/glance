@@ -17,7 +17,7 @@ export function LensRuntime({ fixtureScreen, source, groceryEntry, pairCode }: {
   if (fixtureScreen) {
     const live = source === "live";
     return (
-      <LensProvider capture="sample" fixture initial={(s) => fixtureState(fixtureScreen, live, s)} skipIntro>
+      <LensProvider capture="sample" fixture initial={(s) => fixtureState(fixtureScreen, live, s)}>
         <Lens interactive instant />
       </LensProvider>
     );

@@ -26,7 +26,7 @@ export const COMPOSER_KEYS: string[][] = [
 ];
 
 function header(state: LensState): LensAction[] {
-  const canBack = state.stack.length > 0 || state.composer !== null || (state.screen.id !== "picker" && state.screen.id !== "welcome" && state.screen.id !== rootOf(state.mode));
+  const canBack = state.stack.length > 0 || state.composer !== null || (state.screen.id !== "picker" && state.screen.id !== rootOf(state.mode));
   const actions: LensAction[] = [];
   if (canBack) actions.push({ id: "hdr-back", label: "Back", row: HEADER_ROW, x: 0, variant: "icon", events: [{ type: "nav/back" }] });
   actions.push({ id: "hdr-modes", label: MODE_META[state.mode].label, row: HEADER_ROW, x: 1, variant: "icon", events: [{ type: "nav/replace", screen: { id: "picker" } }], hint: "Modes" });
@@ -119,8 +119,6 @@ export function describeScreen(state: LensState): LensAction[] {
   const s = state.screen;
   const h = header(state);
   switch (s.id) {
-    case "welcome":
-      return [{ id: "skip", label: "Skip", row: ACTION_ROW, x: 1, variant: "quiet", events: [{ type: "intro/done" }] }];
 
     case "picker": {
       // The wheel owns the whole square; the wallet is one chip away inside every mode.

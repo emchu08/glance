@@ -8,7 +8,7 @@ import { LensProvider } from "@/lens/LensProvider";
 export function FixtureTile({ id, live }: { id: string; live: boolean }) {
   return (
     <figure className="rounded-2xl border border-white/10 bg-surface p-3">
-      <LensProvider capture="sample" fixture skipIntro initial={(s) => fixtureState(id, live, s)}>
+      <LensProvider capture="sample" fixture initial={(s) => fixtureState(id, live, s)}>
         <ScaledLens interactive={false} instant className="rounded-xl" />
       </LensProvider>
       <figcaption className="mt-2 flex items-center justify-between text-xs text-muted">

@@ -6,22 +6,23 @@ final class GlanceUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["phone-wallet"].waitForExistence(timeout: 10))
-        // Launch connects by itself: no start button, and no lens until a mode needs one.
-        XCTAssertTrue(app.descendants(matching: .any)["camera-card"].waitForExistence(timeout: 10) || app.descendants(matching: .any)["live-lens"].exists)
+        // Launch connects by itself and the Glance screens are always shown, never the camera picture.
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertFalse(app.descendants(matching: .any)["camera-card"].exists)
         let mode = app.segmentedControls["glasses-mode"]
         XCTAssertTrue(mode.waitForExistence(timeout: 10))
         XCTAssertEqual(app.tabBars.count, 0)
 
-        mode.buttons["Mirror phone"].tap()
+        mode.buttons["Glasses web app"].tap()
         let runtime = app.webViews.firstMatch
         XCTAssertTrue(runtime.waitForExistence(timeout: 20))
         XCTAssertGreaterThan(runtime.frame.width, 300)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "Glance mirror mode"
+        screenshot.name = "Glance web app mode"
         screenshot.lifetime = .keepAlways
         add(screenshot)
-        mode.buttons["Glance on glasses"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["camera-card"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["copy-glasses-url"].waitForExistence(timeout: 10))
+        mode.buttons["Same as phone"].tap()
 
         app.buttons["phone-wallet"].tap()
         XCTAssertTrue(app.buttons["wallet-done"].waitForExistence(timeout: 10))

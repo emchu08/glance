@@ -9,7 +9,7 @@ import type { TripSummary } from "@/domain/grocery/exit";
 import type { Quote } from "@/domain/commerce/quote";
 
 export type ScreenId =
-  | "welcome" | "picker" | "online-listings" | "composer" | "more"
+  | "picker" | "online-listings" | "composer" | "more"
   | "glimpse" | "glimpse-candidates" | "glimpse-offers" | "glimpse-cart" | "glimpse-cart-item" | "handoff"
   | "grocery" | "grocery-item" | "grocery-compare" | "grocery-edit" | "grocery-manual" | "grocery-list"
   | "grocery-checkout" | "grocery-bought" | "grocery-find"
@@ -179,7 +179,6 @@ export interface LensState {
   toast: { text: string; at: number } | null;
   composer: { field: string; value: string; page: number; returnTo: Screen } | null;
   location: { lat: number; lng: number; label: string; source: "demo" | "device" } ;
-  intro: "pending" | "done";
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -187,8 +186,7 @@ export interface LensState {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export type LensEvent =
-  | { type: "init"; reducedMotion?: boolean; capture?: CaptureKind; skipIntro?: boolean }
-  | { type: "intro/done" }
+  | { type: "init"; reducedMotion?: boolean; capture?: CaptureKind }
   | { type: "nav/push"; screen: Screen }
   | { type: "nav/replace"; screen: Screen }
   | { type: "nav/back" }

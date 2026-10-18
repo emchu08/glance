@@ -57,12 +57,8 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
         reducedMotion: event.reducedMotion ?? state.reducedMotion,
         capture: event.capture ?? state.capture,
       };
-      if (event.skipIntro) return { ...next, intro: "done", screen: { id: "picker" }, stack: [] };
       return next;
     }
-    case "intro/done":
-      if (state.intro === "done") return state;
-      return { ...state, intro: "done", screen: { id: "picker" }, stack: [], focusId: null, revision: state.revision + 1 };
 
     case "nav/push":
       return push(state, event.screen);
@@ -112,7 +108,6 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
         mode: state.mode,
         capture: state.capture,
         reducedMotion: state.reducedMotion,
-        intro: "done",
         screen: { id: ROOT_SCREEN[state.mode] },
         session: state.session + 1,
         revision: state.revision + 1,

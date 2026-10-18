@@ -330,14 +330,6 @@
 .lens-wheel-hint { font-size: 26px; color: var(--lens-muted); margin-top: 8px; }
 .lens-wheel-row.is-focused::after { inset: 6px 60px; border-radius: 28px; }
 
-/* Welcome */
-.lens-welcome { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
-.lens-welcome-kicker { font-size: 26px; color: var(--lens-muted); }
-.lens-wordmark { font-family: var(--font-garamond), "EB Garamond", Georgia, serif; font-size: 136px; line-height: 1; letter-spacing: -0.02em; color: var(--lens-accent); position: relative; display: inline-block; padding-right: 20px; }
-.lens-wordmark .is-mask { position: absolute; inset: 0; background: #000; transform-origin: right; }
-.lens-scanbar { position: absolute; top: -8px; bottom: -8px; width: 4px; background: #cfe3fb; box-shadow: 0 0 26px 6px rgba(169, 205, 245, 0.55); border-radius: 2px; }
-.lens-welcome-tag { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; }
-
 /* Donut */
 .lens-donut { display: grid; grid-template-columns: 200px 1fr; gap: 18px; align-items: center; margin-top: 6px; }
 .lens-legend { display: grid; gap: 8px; font-size: 21px; }
