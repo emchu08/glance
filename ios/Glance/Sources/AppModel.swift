@@ -76,7 +76,8 @@ final class AppModel {
         self.transport = transport ?? GlassesTransportFactory.make()
     }
 
-    var cameraLive: Bool { lastFrameAt.map { Date().timeIntervalSince($0) < 2.5 } ?? false }
+    /// On and has sent a picture: a slow camera still counts (its last picture stays up).
+    var cameraLive: Bool { cameraOn && lastFrameAt != nil }
 
     func start() async {
         guard !started else { return }

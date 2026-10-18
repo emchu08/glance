@@ -128,6 +128,10 @@ private struct CameraPreview: View {
                 }
             }
             .clipped()
+            // Clipping hides the fill's overflow but doesn't stop it catching touches: a tall glasses frame
+            // reached up over the bottom of the Glance screens and swallowed taps on Scan, Buy and Done.
+            // The preview is view-only.
+            .allowsHitTesting(false)
         .accessibilityIdentifier("camera-preview")
     }
 }
