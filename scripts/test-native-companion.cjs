@@ -39,11 +39,17 @@ const fs = require('node:fs');
     await page.waitForFunction(() => document.querySelector('.glance-native-activity')?.innerText.includes('Camera not ready'));
     await page.screenshot({ path: '/tmp/glance-grocery-camera-off.png' });
     await page.evaluate(() => { window.frameAvailable = true; window.glanceCompanion.camera({ ready: true, message: 'Camera connected' }); });
-    await page.waitForFunction(() => document.querySelector('.glance-native-activity')?.innerText.includes('Identifying your item'));
+    // Background sampling is reported on the phone; the glasses banner stays steady and costs no display refresh.
+    await page.waitForFunction(() => window.activity?.title === 'Identifying your item…');
     assert.ok(recognition, 'A fresh native frame reaches recognition');
+    await page.waitForFunction(() => document.querySelector('.glance-native-activity')?.innerText.includes('Scanning is on'));
+    const refreshes = await page.evaluate(() => window.nativeMessages.filter(m => m.type === 'refresh').length);
     await page.screenshot({ path: '/tmp/glance-grocery-scanning.png' });
     await recognition.fulfill({ json: { observations: [], model: 'test' } }); recognition = null;
-    await page.waitForFunction(() => document.querySelector('.glance-native-activity')?.innerText.includes('No item recognized yet'));
+    await page.waitForFunction(() => document.querySelector('.glance-native-activity')?.innerText.includes('Move closer and show the label'));
+    await page.waitForFunction(() => window.activity?.title === 'Scanning is on');
+    const afterEmpty = await page.evaluate(() => window.nativeMessages.filter(m => m.type === 'refresh').length);
+    assert.equal(afterEmpty - refreshes, 1, 'One banner change, one display refresh');
     await page.locator('[data-action-id="scan"]').click();
     await page.waitForFunction(() => document.querySelector('.glance-native-activity')?.innerText.includes('Scanning paused'));
     await page.evaluate(() => window.glanceBridge.setActive('scan'));
@@ -82,6 +88,6 @@ const fs = require('node:fs');
     // Late request status must not overwrite the wallet or another mode.
     await page.waitForFunction(() => window.activity.title === 'Your wallet' || window.glanceBridge.getState().screen === 'handoff');
     assert.deepEqual(errors, []);
-    console.log('PASS: camera unavailable, fresh native capture, recognition pending/empty/error, pause, visible focus ring, listing idle/search/error/empty, wallet handoff, no browser errors.');
+    console.log('PASS: camera unavailable, fresh native capture, steady banner during background recognition, recognition pending/empty/error, pause, visible focus ring, listing idle/search/error/empty, wallet handoff, no browser errors.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

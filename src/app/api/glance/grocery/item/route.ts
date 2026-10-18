@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PURCHASE_HISTORY } from "@/data/grocery";
 import { comparisonsFor, deriveFlags, sampleInsight, type ItemInsight } from "@/domain/grocery/insights";
 import { formatCents } from "@/domain/money";
+import { CACHE_TTL, readCache, writeCache } from "@/server/cache";
 import { groceryInsight } from "@/server/claude";
 import { aiConfigured } from "@/server/env";
 import { errorResponse, imageSchema, json, readJson } from "@/server/http";
@@ -16,6 +17,10 @@ export async function POST(req: Request) {
     const body = await readJson(req, Body);
     const local = sampleInsight(body.productKey);
     if (local || !aiConfigured()) return json({ insight: local, model: "sample" });
+    // Nutrition and typical price belong to the product, so a repeat scan is answered instantly.
+    const cacheKey = [body.productKey, body.label, body.packageSize];
+    const cached = await readCache<{ insight: ItemInsight; model: string }>("insight", cacheKey);
+    if (cached) return json({ ...cached, cached: true });
     const history = PURCHASE_HISTORY[body.productKey];
     const comps = comparisonsFor(body.productKey);
     const r = await groceryInsight(body.label, body.packageSize ?? null, body.image ?? null, {
@@ -27,6 +32,7 @@ export async function POST(req: Request) {
       productId: body.productKey, isFood: r.is_food, nutrition, nutritionOrigin: r.nutrition_origin, allergens: r.allergens, allergenOrigin: r.allergen_origin,
       flags: deriveFlags(nutrition), nudge: r.nudge, homePriceCents: r.typical_price_usd !== null ? Math.round(r.typical_price_usd * 100) : null, comparisons: comps, bestSame: comps.find((c) => c.match === "same") ?? null, cheapestOnline: comps.find((c) => c.match === "same" && (c.store === "Amazon" || c.store === "Temu")) ?? null,
     };
+    await writeCache("insight", cacheKey, { insight, model: r.model }, CACHE_TTL.insightMs);
     return json({ insight, model: r.model });
   } catch (e) { return errorResponse(e); }
 }

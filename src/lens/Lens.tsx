@@ -73,7 +73,7 @@ export function Lens({ interactive = true, scale = 1, instant = false, className
 
       <AnimatePresence>
         {(state.toast || state.grocery.acknowledgement) && (
-          <motion.div className="lens-toast" role="status" initial={reduced ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          <motion.div className="lens-toast" role="status" initial={reduced ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : 0.18 }}>
             {state.grocery.acknowledgement ?? state.toast?.text}
           </motion.div>
         )}

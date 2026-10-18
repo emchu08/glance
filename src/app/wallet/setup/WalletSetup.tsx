@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
@@ -37,14 +37,19 @@ export function WalletSetup({ initialUser, initialWallet, publishableKey, sandbo
         </header>
 
         <h1 className="text-3xl font-semibold tracking-tight">Set up your Glance wallet</h1>
-        <p className="mt-2 text-muted">One-time setup. After this, eligible purchases happen with a single Buy on your glasses. Card details stay with Stripe; Glance keeps only a masked reference.</p>
+        <p className="mt-2 text-muted">Two quick steps: sign in, then add a card. After that, eligible items are one Buy on your glasses. Card details stay with Stripe; Glance keeps only the last four digits.</p>
+        {sandbox && (
+          <p className="mt-4 rounded-xl border border-white/15 bg-surface p-3 text-sm text-muted">
+            <b className="text-fg">This is a test wallet.</b> Glance is running in Stripe’s sandbox, so no real money moves and real debit or credit cards are declined. Use the test card button below.
+          </p>
+        )}
 
         <ol className="mt-8 grid gap-3">
-          <StepCard n={1} title="Glance account" done={step > 1} active={step === 1} icon={<Glasses size={18} />}>
+          <StepCard n={1} title="Sign in" done={step > 1} active={step === 1} icon={<Glasses size={18} />}>
             {user ? <p className="text-sm text-muted">Signed in as <span className="text-fg">{user.email}</span>. <button className="underline" onClick={async () => { await api("/api/auth", { action: "sign-out" }); setUser(null); setWallet(null); }}>Sign out</button></p> : <AuthForm onDone={async (email) => { setUser({ email }); await refresh(); }} onError={setError} />}
           </StepCard>
 
-          <StepCard n={2} title="Saved card" done={step > 2} active={step === 2} icon={<CreditCard size={18} />}>
+          <StepCard n={2} title="Add a card" done={step > 2} active={step === 2} icon={<CreditCard size={18} />}>
             {wallet?.status === "ready" ? (
               <div className="flex items-center justify-between text-sm">
                 <span>{wallet.brand} •• {wallet.last4} · ready</span>
@@ -55,9 +60,6 @@ export function WalletSetup({ initialUser, initialWallet, publishableKey, sandbo
             ) : <p className="text-sm text-subtle">Sign in first.</p>}
           </StepCard>
 
-          <StepCard n={3} title="Delivery and Auto-buy (optional)" done={false} active={step === 3} icon={<ShieldCheck size={18} />}>
-            {wallet?.status === "ready" ? <RuleForm wallet={wallet} onChange={setWallet} onError={setError} /> : <p className="text-sm text-subtle">Available after a card is saved.</p>}
-          </StepCard>
         </ol>
 
         {error && <p className="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-warn">{error}</p>}
@@ -67,10 +69,16 @@ export function WalletSetup({ initialUser, initialWallet, publishableKey, sandbo
             <div className="flex items-center gap-2 font-medium text-best"><Check size={18} /> Ready to shop</div>
             <p className="mt-1 text-sm text-muted">Open the lens and the wallet chip shows <b className="text-fg">{wallet.brand} •• {wallet.last4}</b>. Eligible offers show <b className="text-fg">Buy $X</b>.</p>
             <div className="mt-3 flex gap-2 text-sm">
-              <Link href="/glasses" className="rounded-full bg-fg px-4 py-2 font-medium text-canvas">Open glasses view</Link>
-              <Link href="/demo" className="rounded-full border border-white/20 px-4 py-2">Presenter</Link>
+              <Link href="/glasses" className="rounded-full bg-fg px-4 py-2 font-medium text-canvas">Back to Glance</Link>
             </div>
           </div>
+        )}
+
+        {wallet?.status === "ready" && (
+          <details className="mt-4 rounded-2xl border border-white/10 bg-surface/50 p-5">
+            <summary className="flex cursor-pointer items-center gap-3 font-medium"><ShieldCheck size={18} className="text-muted" /> Auto-buy and delivery <span className="text-sm font-normal text-subtle">optional</span></summary>
+            <div className="mt-3"><RuleForm wallet={wallet} onChange={setWallet} onError={setError} /></div>
+          </details>
         )}
 
         <p className="mt-10 text-xs text-subtle">
@@ -97,41 +105,60 @@ function StepCard({ n, title, done, active, icon, children }: { n: number; title
 function AuthForm({ onDone, onError }: { onDone: (email: string) => void; onError: (e: string | null) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-up");
   const [busy, setBusy] = useState(false);
+  // One path for new and returning shoppers: the server creates the account when needed, then signs in.
   return (
-    <form className="grid gap-2" onSubmit={async (e) => { e.preventDefault(); setBusy(true); onError(null); try { await api("/api/auth", { action: mode, email, password }); onDone(email); } catch (err) { onError((err as Error).message); } finally { setBusy(false); } }}>
+    <form className="grid gap-2" onSubmit={async (e) => {
+      e.preventDefault(); setBusy(true); onError(null);
+      try { await api("/api/auth", { action: "sign-up", email, password }); onDone(email); }
+      catch (err) { const m = (err as Error).message; onError(/invalid login/i.test(m) ? "That email already has a Glance account and the password didn’t match." : m); }
+      finally { setBusy(false); }
+    }}>
       <input className="rounded-xl border border-white/15 bg-canvas px-3 py-2 text-sm" type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-      <input className="rounded-xl border border-white/15 bg-canvas px-3 py-2 text-sm" type="password" required minLength={8} placeholder="Password (8+ characters)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "sign-up" ? "new-password" : "current-password"} />
-      <div className="flex items-center gap-3">
-        <button disabled={busy} className="rounded-full bg-fg px-4 py-2 text-sm font-medium text-canvas disabled:opacity-60">{busy ? "…" : mode === "sign-up" ? "Create account" : "Sign in"}</button>
-        <button type="button" className="text-sm text-muted underline" onClick={() => setMode(mode === "sign-up" ? "sign-in" : "sign-up")}>{mode === "sign-up" ? "I have an account" : "Create an account"}</button>
-      </div>
+      <input className="rounded-xl border border-white/15 bg-canvas px-3 py-2 text-sm" type="password" required minLength={8} placeholder="Password (8+ characters)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+      <p className="text-xs text-subtle">New here? This creates your account. Already have one? Use the same password.</p>
+      <button disabled={busy} className="justify-self-start rounded-full bg-fg px-4 py-2 text-sm font-medium text-canvas disabled:opacity-60">{busy ? "Signing in…" : "Continue"}</button>
     </form>
   );
 }
 
+// Stripe's card form follows the page: the phone companion shows this page light, the browser shows it dark.
+const subscribeScheme = (onChange: () => void) => { const mq = window.matchMedia("(prefers-color-scheme: light)"); mq.addEventListener("change", onChange); return () => mq.removeEventListener("change", onChange); };
+const pageIsLight = () => getComputedStyle(document.documentElement).colorScheme.includes("light") || window.matchMedia("(prefers-color-scheme: light)").matches;
+
+const TEST_CARDS = [
+  { label: "Visa", number: "4242 4242 4242 4242" },
+  { label: "Visa debit", number: "4000 0566 5566 5556" },
+  { label: "Mastercard debit", number: "5200 8282 8282 8210" },
+];
+
 function CardSetup({ publishableKey, sandbox, onSaved, onError }: { publishableKey: string; sandbox: boolean; onSaved: (w: WalletView) => void; onError: (e: string | null) => void }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const light = useSyncExternalStore(subscribeScheme, pageIsLight, () => false);
   const stripePromise = useMemo<Promise<Stripe | null> | null>(() => (publishableKey ? loadStripe(publishableKey) : null), [publishableKey]);
   useEffect(() => {
     api<{ clientSecret: string }>("/api/wallet/setup", { action: "setup-intent" }).then((r) => setClientSecret(r.clientSecret)).catch((e) => onError((e as Error).message));
   }, [onError]);
+  const form = clientSecret && stripePromise ? (
+    <Elements stripe={stripePromise} options={{ clientSecret, appearance: light ? { theme: "stripe", variables: { colorPrimary: "#2864e8", borderRadius: "12px", fontFamily: "Geist, system-ui, sans-serif" } } : { theme: "night", variables: { colorPrimary: "#635bff", colorBackground: "#16132b", borderRadius: "12px", fontFamily: "Geist, system-ui, sans-serif" } } }}>
+      <ElementsForm onSaved={onSaved} onError={onError} />
+    </Elements>
+  ) : <p className="text-sm text-subtle">Loading secure card form…</p>;
+  if (!sandbox) return <div className="grid gap-3"><p className="text-sm text-muted">Debit or credit card.</p>{form}</div>;
   return (
     <div className="grid gap-4">
-      {sandbox && (
-        <button disabled={busy} className="flex items-center justify-between rounded-xl border border-stripe/60 bg-stripe/10 px-4 py-3 text-left text-sm hover:bg-stripe/20 disabled:opacity-60" onClick={async () => { setBusy(true); onError(null); try { onSaved(await api<WalletView>("/api/wallet/setup", { action: "use-test-visa", consentVersion: CONSENT_VERSION })); } catch (e) { onError((e as Error).message); } finally { setBusy(false); } }}>
-          <span><b>Use Stripe’s test Visa •• 4242</b><br /><span className="text-muted">Attaches Stripe’s sandbox test card as a real saved method. Fastest for the demo.</span></span>
-          <span className="rounded-full bg-stripe px-3 py-1 text-xs font-medium text-white">{busy ? "Saving…" : "Use"}</span>
-        </button>
-      )}
-      <div className="text-xs uppercase tracking-wide text-subtle">or enter a card</div>
-      {clientSecret && stripePromise ? (
-        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "night", variables: { colorPrimary: "#635bff", colorBackground: "#16132b", borderRadius: "12px", fontFamily: "Geist, system-ui, sans-serif" } } }}>
-          <ElementsForm onSaved={onSaved} onError={onError} />
-        </Elements>
-      ) : <p className="text-sm text-subtle">Loading secure card form…</p>}
+      <button disabled={busy} className="flex items-center justify-between rounded-xl border border-stripe/60 bg-stripe/10 px-4 py-3 text-left text-sm hover:bg-stripe/20 disabled:opacity-60" onClick={async () => { setBusy(true); onError(null); try { onSaved(await api<WalletView>("/api/wallet/setup", { action: "use-test-visa", consentVersion: CONSENT_VERSION })); } catch (e) { onError((e as Error).message); } finally { setBusy(false); } }}>
+        <span><b>Add test card · Visa •• 4242</b><br /><span className="text-muted">One tap. Works like a real saved card, without real money.</span></span>
+        <span className="rounded-full bg-stripe px-3 py-1 text-xs font-medium text-white">{busy ? "Adding…" : "Add"}</span>
+      </button>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted">Type in a test card instead</summary>
+        <div className="mt-3 grid gap-3">
+          <p className="text-xs text-subtle">Use any future expiry date, any 3-digit CVC and any ZIP code: {TEST_CARDS.map((c, i) => <span key={c.number}>{i ? " · " : ""}{c.label} <span className="whitespace-nowrap font-mono text-fg">{c.number}</span></span>)}</p>
+          {form}
+        </div>
+      </details>
     </div>
   );
 }
@@ -140,7 +167,6 @@ function ElementsForm({ onSaved, onError }: { onSaved: (w: WalletView) => void; 
   const stripe = useStripe();
   const elements = useElements();
   const [busy, setBusy] = useState(false);
-  const [consent, setConsent] = useState(false);
   return (
     <form className="grid gap-3" onSubmit={async (e) => {
       e.preventDefault();
@@ -155,8 +181,8 @@ function ElementsForm({ onSaved, onError }: { onSaved: (w: WalletView) => void; 
       } catch (err) { onError((err as Error).message); } finally { setBusy(false); }
     }}>
       <PaymentElement options={{ layout: "tabs" }} />
-      <label className="flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} required /> Save this card for purchases I start on my Glance glasses. I can remove it any time.</label>
-      <button disabled={!stripe || busy || !consent} className="rounded-full bg-fg px-4 py-2 text-sm font-medium text-canvas disabled:opacity-60">{busy ? "Saving…" : "Save card"}</button>
+      <p className="text-xs text-muted">Saving lets Glance charge this card only when you choose Buy on your glasses (or an Auto-buy rule you set). Remove it any time.</p>
+      <button disabled={!stripe || busy} className="justify-self-start rounded-full bg-fg px-4 py-2 text-sm font-medium text-canvas disabled:opacity-60">{busy ? "Saving…" : "Save card"}</button>
     </form>
   );
 }

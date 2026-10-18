@@ -41,6 +41,8 @@ final class DATTransport: GlassesTransport {
     private var cameraMeasurementStart = Date()
     private static let logger = Logger(subsystem: "com.glance.companion", category: "performance")
     private struct EncodedFrame: Sendable { let jpeg: Data; let width: Int; let height: Int }
+    static let cameraFrameRate: UInt = 2
+    private var lastSentDigest: Data?
 
     private func configure() throws {
         guard !configured else { return }
@@ -205,7 +207,10 @@ final class DATTransport: GlassesTransport {
                 throw TransportError.message("Camera permission was denied in Meta AI.")
             }
         }
-        guard let capability = try session.addCamera(config: StreamConfiguration(videoCodec: .raw, resolution: .low, frameRate: 24)) else {
+        // Camera and display share one Bluetooth Classic link. Recognition reads at most one frame every few
+        // seconds, so 2 fps (the lowest valid rate) keeps a fresh frame while leaving the link to display updates.
+        // At this rate the link affords the medium resolution, which reads labels better than low.
+        guard let capability = try session.addCamera(config: StreamConfiguration(videoCodec: .raw, resolution: .medium, frameRate: Self.cameraFrameRate)) else {
             throw TransportError.message("Camera unavailable. Reconnect the glasses.")
         }
         camera = capability
@@ -319,12 +324,20 @@ final class DATTransport: GlassesTransport {
 
     func present(lensImage: UIImage, state: LensBridge.PublishedState) async throws -> Bool {
         guard let display, displayReady, inputsReady else { return false }
+        // A revision without a visible change (status refresh, focus on an unchanged screen) needs no transfer;
+        // the glasses already show these pixels, so only the delivered revision moves forward.
+        let digest = LensBridge.pixelDigest(lensImage)
+        if let digest, digest == lastSentDigest {
+            deliveredState = state
+            return true
+        }
         try await display.send(
             FlexBox(direction: .column, spacing: 0) {
                 MWDATDisplay.Image(image: lensImage, sizePreset: .fill)
             }.padding(0)
         )
         guard self.display === display, displayReady, inputsReady else { return false }
+        lastSentDigest = digest
         deliveredState = state
         return true
     }
@@ -356,6 +369,7 @@ final class DATTransport: GlassesTransport {
         display?.stop()
         display = nil
         displayReady = false
+        lastSentDigest = nil
         displayToken = nil
         session?.stop()
         session = nil

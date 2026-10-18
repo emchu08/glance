@@ -220,7 +220,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
           const price = e.priceCents ?? product?.qfcPriceCents ?? null;
           const cart = addToCart(grocery.cart, { productKey: e.productKey, label: e.label, packageSize: e.packageSize, unitPriceCents: price, priceSource: e.priceCents ? "shelf-label" : product ? "catalog" : "unknown", eventId: e.eventId });
           if (cart !== grocery.cart) {
-            grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: e.productKey, heldKey: null, heldLabel: null, heldSize: null };
+            grocery = { ...grocery, undo: [grocery.cart, ...grocery.undo].slice(0, MAX_UNDO), cart, lastAddKey: e.productKey, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
             list = completeListFromCart(list, cart);
             toast = { text: `Added ${e.label}`, at: Date.now() };
             // The camera confirmed the placement: the held-item card returns to the cart.
@@ -232,14 +232,16 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
         } else if (e.type === "ask") {
           grocery = { ...grocery, pendingAsk: { eventId: e.eventId, productKey: e.productKey, label: e.label, packageSize: e.packageSize, priceCents: e.priceCents } };
         } else if (e.type === "held") {
-          grocery = { ...grocery, heldKey: e.productKey, heldLabel: e.label, heldSize: e.packageSize };
+          const estimate = event.observations.find((o) => o.productKey === e.productKey)?.estimatedPriceCents ?? null;
+          const heldPrice = e.priceCents ? { cents: e.priceCents, source: "shelf-label" as const } : estimate ? { cents: estimate, source: "estimate" as const } : null;
+          grocery = { ...grocery, heldKey: e.productKey, heldLabel: e.label, heldSize: e.packageSize, heldPrice };
           // The held-item card opens once per hold, only from the grocery root.
           if (screen.id === "grocery") {
             stack = [...stack, screen];
             screen = { id: "grocery-item", params: { productKey: e.productKey } };
           }
         } else if (e.type === "put-back") {
-          if (grocery.heldKey === e.productKey) grocery = { ...grocery, heldKey: null, heldLabel: null, heldSize: null };
+          if (grocery.heldKey === e.productKey) grocery = { ...grocery, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
           if (screen.id === "grocery-item" && screen.params?.productKey === e.productKey) {
             screen = { id: "grocery" };
             stack = stack.filter((s) => s.id !== "grocery");
@@ -255,7 +257,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       const { state: tracker, alreadyCounted } = claimHold(state.grocery.tracker, key);
       const label = held?.label ?? state.grocery.heldLabel ?? CATALOG_BY_ID[key]?.name ?? key;
       const size = held?.packageSize ?? state.grocery.heldSize ?? CATALOG_BY_ID[key]?.size ?? null;
-      let grocery = { ...state.grocery, tracker, heldKey: null, heldLabel: null, heldSize: null };
+      let grocery = { ...state.grocery, tracker, heldKey: null, heldLabel: null, heldSize: null, heldPrice: null };
       if (alreadyCounted) {
         grocery = { ...grocery, acknowledgement: "Already in your cart" };
       } else {

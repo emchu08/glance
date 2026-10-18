@@ -434,11 +434,14 @@ function GroceryItem() {
   const name = product?.name ?? state.grocery.heldLabel ?? key;
   const size = product?.size ?? state.grocery.heldSize ?? "";
   const best = data?.bestSame && data.homePriceCents !== null && data.bestSame.priceCents < (data.homePriceCents ?? Infinity) ? data.bestSame : null;
+  const held = state.grocery.heldKey === key ? state.grocery.heldPrice ?? null : null;
+  const price = data?.homePriceCents ?? product?.qfcPriceCents ?? held?.cents ?? null;
+  const priceNote = data?.homePriceCents == null && !product && held?.source === "estimate" ? "typical price" : null;
   return (
     <div>
       <h2 className="lens-title is-wrap" style={{ fontSize: 40 }}>{name}</h2>
       <p className="lens-sub">{size ? `${size} · ` : ""}{HOME_STORE}</p>
-      <div className="lens-price" style={{ fontSize: 60 }}>{formatCents(data?.homePriceCents ?? product?.qfcPriceCents ?? null)}{best ? <small>{best.store} <span style={{ color: "var(--lens-best)" }}>{formatCents(best.priceCents)}</span></small> : null}</div>
+      <div className="lens-price" style={{ fontSize: 60 }}>{price === null && ins?.status === "loading" ? "…" : formatCents(price)}{priceNote && !best ? <small>{priceNote}</small> : null}{best ? <small>{best.store} <span style={{ color: "var(--lens-best)" }}>{formatCents(best.priceCents)}</span></small> : null}</div>
       {ins?.status === "loading" && <p className="lens-sub" style={{ marginTop: 10 }}>Checking nutrition…</p>}
       {data?.nutrition && (
         <p className="lens-sub" style={{ marginTop: 10, fontSize: 20 }}>≈ {data.nutrition.kcal} cal · {data.nutrition.carbs} g carbs · {data.nutrition.sugar} g sugar · Estimate</p>

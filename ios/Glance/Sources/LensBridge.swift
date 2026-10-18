@@ -2,6 +2,7 @@ import Foundation
 import WebKit
 import UIKit
 import OSLog
+import CryptoKit
 
 /// One interactive web runtime serves the phone and the glasses. Capture and
 /// Bluetooth delivery have separate, bounded queues: never build a backlog.
@@ -174,6 +175,12 @@ final class LensBridge: NSObject, WKScriptMessageHandler, WKScriptMessageHandler
                 }
             }
         }
+    }
+
+    /// SHA-256 of the bitmap, so identical frames are recognised without re-encoding them.
+    static func pixelDigest(_ image: UIImage) -> Data? {
+        guard let data = image.cgImage?.dataProvider?.data as Data? else { return nil }
+        return Data(SHA256.hash(data: data))
     }
 
     static func displayImage(_ image: UIImage) -> UIImage {

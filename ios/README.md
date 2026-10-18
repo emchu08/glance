@@ -43,15 +43,22 @@ Browser-only pages still require a deployment. Remote app code comes from the
 canonical server and is not pinned to a particular commit.
 
 The native integration supplies fresh camera frames directly to the hosted
-capture adapter, avoiding its HTTP relay round trip. Camera acquisition requests
-24 fps; recognition still samples on demand (Grocery every 3 seconds with one
-request in flight). These are separate rates. The relay retains a bounded
-1 fps upload for existing phone link handoffs, independent of rendering/capture.
+capture adapter, avoiding its HTTP relay round trip. Camera and display share one
+Bluetooth Classic link, so the camera streams at 2 fps (medium resolution):
+recognition reads at most one frame every few seconds (Grocery every 3 seconds
+with one request in flight), and the rest of the link stays free for display
+updates. The relay retains a bounded 1 fps upload for existing phone link
+handoffs, independent of rendering/capture.
 
 Display snapshots are 600×600 **pixels**, not 1800×1800 Retina pixels. A 16ms
 coalescing window replaces the former 90ms delay. Capturing is independent of
 SDK delivery, with at most one send in flight and one newest pending image;
-intermediate frames are discarded. Duplicate bridge messages are ignored.
+intermediate frames are discarded. Duplicate bridge messages are ignored, and an
+image whose pixels match the one already on the glasses is not sent again (its
+revision is still recorded for Select). Background Grocery sampling updates the
+phone's status line but not the glasses banner, so it costs no display transfers.
+The native lens renders without motion, so a snapshot never captures a half-finished
+spring.
 Xcode logs `[Glance performance]` with capture and SDK send timings. A static
 screen is event-driven, not a continuously streaming video. No glasses frame-rate
 guarantee can be made from the camera setting or simulator timing alone.

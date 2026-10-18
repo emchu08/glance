@@ -89,6 +89,8 @@ export interface GroceryState {
   heldKey: string | null;
   heldLabel: string | null;
   heldSize: string | null;
+  /** Price known at recognition time (shelf label, else model estimate) so the card never waits on insight. */
+  heldPrice?: { cents: number; source: "shelf-label" | "estimate" } | null;
   pendingAsk: { eventId: string; productKey: string; label: string; packageSize: string | null; priceCents: number | null } | null;
   insights: Record<string, { status: AsyncStatus; data: ItemInsight | null }>;
   nudgedKeys: string[];

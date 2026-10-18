@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Offer } from "@/data/types";
 import { demoMerchantOffersFor, sampleOffersForLabel } from "@/domain/sample";
 import { sponsoredOfferFor } from "@/server/ads";
-import { searchListings } from "@/server/claude";
+import { searchListingsCached } from "@/server/claude";
 import { aiConfigured, supabaseConfigured } from "@/server/env";
 import { errorResponse, json, readJson } from "@/server/http";
 import { currentUser } from "@/server/supabase";
@@ -20,15 +20,26 @@ export async function POST(req: Request) {
     const user = supabaseConfigured() ? await currentUser().catch(() => null) : null;
     const demo = demoMerchantOffersFor(body.candidate.label, body.candidate.id);
     const sponsored = supabaseConfigured() ? await sponsoredOfferFor(label, user?.id ?? null).catch(() => null) : null;
-    let rest: Offer[] = [];
-    let ranker = "sample";
     if (body.sample || !aiConfigured()) {
-      rest = sampleOffersForLabel(body.candidate.label, body.candidate.id).filter((o) => o.kind !== "connect_merchant");
-    } else {
-      ranker = "live-grounded";
-      for await (const ev of searchListings(label, body.candidate.id)) if (ev.offer) rest.push(ev.offer);
+      const rest = sampleOffersForLabel(body.candidate.label, body.candidate.id).filter((o) => o.kind !== "connect_merchant");
+      return json({ offers: [...(sponsored ? [sponsored] : []), ...rest.slice(0, 1), ...demo, ...rest.slice(1)], ranker: "sample" });
     }
-    const offers = [...(sponsored ? [sponsored] : []), ...rest.slice(0, 1), ...demo, ...rest.slice(1)];
-    return json({ offers, ranker });
+    const wantsStream = (req.headers.get("accept") ?? "").includes("application/x-ndjson");
+    if (!wantsStream) {
+      const rest: Offer[] = [];
+      for await (const ev of searchListingsCached(label, body.candidate.id)) if (ev.offer) rest.push(ev.offer);
+      return json({ offers: [...(sponsored ? [sponsored] : []), ...rest.slice(0, 1), ...demo, ...rest.slice(1)], ranker: "live-grounded" });
+    }
+    // Buyable demo-merchant and sponsored offers are known now; grounded web listings follow as they validate.
+    const enc = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const write = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
+        for (const offer of [...(sponsored ? [sponsored] : []), ...demo]) write({ offer });
+        for await (const ev of searchListingsCached(label, body.candidate.id)) write(ev);
+        controller.close();
+      },
+    });
+    return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });
   } catch (e) { return errorResponse(e); }
 }

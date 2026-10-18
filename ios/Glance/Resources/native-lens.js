@@ -13,8 +13,10 @@
     : screen.startsWith('gourmet') ? 'gourmet'
     : /offers|listings/.test(screen) ? 'listings' : 'glimpse';
   const requestInfo = (path) => {
-    if (path === '/api/relay/frame') return { scope: scopeFor(document.querySelector('.lens')?.dataset.screen || ''), title: 'Capturing a fresh image…' };
-    if (path === '/api/glance/grocery') return { scope: 'grocery', title: 'Identifying your item…' };
+    // Local camera frames return in milliseconds; announcing them would only flash the display.
+    if (path === '/api/relay/frame') return { scope: scopeFor(document.querySelector('.lens')?.dataset.screen || ''), title: 'Capturing a fresh image…', quiet: true };
+    // The 3-second grocery sampler is background work: the phone may describe it, the glasses stay steady.
+    if (path === '/api/glance/grocery') return { scope: 'grocery', title: 'Identifying your item…', background: true };
     if (path === '/api/glance/grocery/item') return { scope: 'grocery', title: 'Checking price and nutrition…' };
     if (path === '/api/glance/glimpse') return { scope: 'glimpse', title: 'Identifying what you see…' };
     if (path === '/api/glance/gourmet') return { scope: 'gourmet', title: 'Identifying your dish…' };
@@ -33,7 +35,10 @@
     const screen = lens.dataset.screen || '';
     if (lastScreen !== screen) { results.clear(); lastScreen = screen; }
     const scope = scopeFor(screen);
-    const running = [...requests.values()].filter(r => r.scope === scope).at(-1);
+    const active = [...requests.values()].filter(r => r.scope === scope && !r.quiet);
+    const running = active.at(-1);
+    // Banner text shown on the glasses ignores background sampling; the phone activity line does not.
+    const foreground = active.filter(r => !r.background).at(-1);
     const last = results.get(scope);
     const scan = lens.querySelector('[data-action-id="scan"]');
     const paused = /Start scan|Scan more/.test(scan?.textContent || '') || /Scan paused/.test(lens.querySelector('.lens-status')?.textContent || '');
@@ -48,7 +53,7 @@
     } else if (last?.error) {
       title = scope === 'listings' ? 'Couldn’t load listings' : 'Couldn’t finish the scan'; detail = last.error;
     } else if (screen === 'grocery') {
-      title = last?.empty ? 'No item recognized yet' : last?.recognized ? 'Item recognized' : 'Scanning is on';
+      title = 'Scanning is on';
       detail = last?.empty ? 'Move closer and show the label. Scanning continues.' : 'Hold up an item. Only items added count in your cart.';
     } else if (/offers|listings/.test(screen)) {
       const text = lens.innerText;
@@ -67,21 +72,29 @@
     // Reuse the heading's space rather than adding another navigation bar.
     let banner = lens.querySelector('.glance-native-activity');
     const body = lens.querySelector('.lens-body');
+    let bannerTitle = title, bannerDetail = detail;
+    if (screen === 'grocery' && running?.background && !foreground) {
+      bannerTitle = 'Scanning is on';
+      bannerDetail = last?.empty ? 'Move closer and show the label. Scanning continues.' : 'Hold up an item. Only items added count in your cart.';
+    }
+    let changed = false;
     if (screen === 'grocery' && body) {
       if (!banner) {
+        changed = true;
         banner = document.createElement('div'); banner.className = 'glance-native-activity';
         banner.setAttribute('role', 'status'); banner.setAttribute('aria-live', 'polite');
         banner.innerHTML = '<strong></strong><span></span>';
         body.prepend(banner);
       }
-      if (banner.firstChild.textContent !== title) banner.firstChild.textContent = title;
-      if (banner.lastChild.textContent !== detail) banner.lastChild.textContent = detail;
-    } else { banner?.remove(); }
+      if (banner.firstChild.textContent !== bannerTitle) { banner.firstChild.textContent = bannerTitle; changed = true; }
+      if (banner.lastChild.textContent !== bannerDetail) { banner.lastChild.textContent = bannerDetail; changed = true; }
+    } else if (banner) { banner.remove(); changed = true; }
+    // Phone-only status never costs a Bluetooth image; only a visible banner change does.
+    if (changed) post({ type: 'refresh' });
     const activity = JSON.stringify({ type: 'activity', title, detail });
     if (activity !== previousActivity) {
       previousActivity = activity;
       window.webkit.messageHandlers.glance.postMessage(JSON.parse(activity));
-      post({ type: 'refresh' });
     }
   }
   window.glanceCompanion = {

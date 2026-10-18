@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Offer } from "@/data/types";
 import { sponsoredOfferFor } from "@/server/ads";
-import { searchListings } from "@/server/claude";
+import { searchListingsCached } from "@/server/claude";
 import { aiConfigured, supabaseConfigured } from "@/server/env";
 import { clientKey, errorResponse, json, readJson } from "@/server/http";
 import { rateLimit } from "@/server/relay";
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     if (!wantsStream) {
       const offers: Offer[] = sponsored ? [sponsored] : [];
       let error: string | null = null;
-      for await (const ev of searchListings(body.query)) { if (ev.offer) offers.push(ev.offer); if (ev.error) error = ev.error; }
+      for await (const ev of searchListingsCached(body.query)) { if (ev.offer) offers.push(ev.offer); if (ev.error) error = ev.error; }
       if (error && !offers.length) throw new HttpError(502, error);
       return json({ offers, error });
     }
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       async start(controller) {
         const write = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
         if (sponsored) write({ offer: sponsored });
-        for await (const ev of searchListings(body.query)) write(ev);
+        for await (const ev of searchListingsCached(body.query)) write(ev);
         controller.close();
       },
     });

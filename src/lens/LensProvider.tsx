@@ -158,12 +158,14 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
 
   // ── Reduced motion ─────────────────────────────────────────────────────────
   useEffect(() => {
+    // Glasses receive still snapshots, so a spring caught mid-flight would stay on the display. Native lenses never animate.
+    const native = capture === "native";
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    dispatch({ type: "init", reducedMotion: mq.matches });
-    const h = () => dispatch({ type: "init", reducedMotion: mq.matches });
+    dispatch({ type: "init", reducedMotion: native || mq.matches });
+    const h = () => dispatch({ type: "init", reducedMotion: native || mq.matches });
     mq.addEventListener("change", h);
     return () => mq.removeEventListener("change", h);
-  }, [dispatch]);
+  }, [dispatch, capture]);
 
   // ── Welcome timer (only the interactive lens drives it) ────────────────────
   useEffect(() => {
@@ -249,10 +251,12 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const t0 = performance.now();
         (async () => {
           try {
-            const offers = await timed("offers", () => svc.fetchOffers({ id: cand.id, label: cand.label }, s.capture, c.signal));
-            if (!stillCurrent() || c.signal.aborted) return;
-            setDiag((d) => ({ ...d, tapToFirstCardMs: Math.round(performance.now() - t0) }));
-            dispatch({ type: "glimpse/offers-result", query: cand.label, offers, done: true });
+            let first = true;
+            await timed("offers", () => svc.fetchOffers({ id: cand.id, label: cand.label }, s.capture, (offers, done) => {
+              if (!stillCurrent() || c.signal.aborted) return;
+              if (first && offers.length) { first = false; setDiag((d) => ({ ...d, tapToFirstCardMs: Math.round(performance.now() - t0) })); }
+              dispatch({ type: "glimpse/offers-result", query: cand.label, offers, done });
+            }, c.signal));
           } catch (e) {
             if (c.signal.aborted) return;
             dispatch({ type: "glimpse/offers-error", query: cand.label, error: (e as Error).message });

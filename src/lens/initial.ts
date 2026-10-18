@@ -37,6 +37,7 @@ export function initialState(): LensState {
       heldKey: null,
       heldLabel: null,
       heldSize: null,
+      heldPrice: null,
       pendingAsk: null,
       insights: {},
       nudgedKeys: [],

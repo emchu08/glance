@@ -156,6 +156,8 @@ export interface GroceryObservation {
   confidence: number;
   packageSize: string | null;
   priceCents: number | null;
+  /** Model estimate of a typical price, shown while no shelf or catalog price is known. Never billed. */
+  estimatedPriceCents?: number | null;
 }
 
 export interface CartLine {
