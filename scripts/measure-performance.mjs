@@ -1,5 +1,5 @@
 // Frame-timing benchmark for the lens and the 3D site. Uses Chrome via Playwright when available
-// (installed with npm i -D playwright), otherwise prints manual instructions. Results are written to measurements/.
+// (a dev dependency), otherwise prints manual instructions. Results are written to measurements/.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { baseUrl } from "./_env.mjs";
 
@@ -10,7 +10,7 @@ const pages = [
 let chromium;
 try { ({ chromium } = await import("playwright")); } catch { /* none */ }
 if (!chromium) {
-  console.log("Playwright not found. Install it (npm i -D playwright) or run with Chrome DevTools → Performance. Record median, p95/p99 frame intervals, dropped frames.");
+  console.log("Playwright not found. Run npm install, then npx playwright install chromium or run with Chrome DevTools → Performance. Record median, p95/p99 frame intervals, dropped frames.");
   process.exit(0);
 }
 let browser;
