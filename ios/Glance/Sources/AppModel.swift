@@ -38,13 +38,6 @@ final class AppModel {
         }
     }
 
-    /// What the phone's screen shows. The glasses always show the Glance screens.
-    enum PhoneView: String, CaseIterable, Identifiable {
-        case camera, glance
-        var id: String { rawValue }
-        var title: String { self == .camera ? "Camera" : "Glance" }
-    }
-
     var connection: ConnectionState = .idle
     var capabilities = DeviceCapabilities()
     var relayStatus: String = "Connecting…"
@@ -56,11 +49,6 @@ final class AppModel {
     var launchStatus = "Connecting to your glasses…"
     var showWallet = false
     var isLaunching = false
-    var phoneView: PhoneView = PhoneView(rawValue: UserDefaults.standard.string(forKey: AppModel.phoneViewKey) ?? "") ?? .glance {
-        didSet { UserDefaults.standard.set(phoneView.rawValue, forKey: AppModel.phoneViewKey) }
-    }
-    /// v2: the camera is off between scans, so the phone shows Glance unless asked for the camera.
-    private static let phoneViewKey = "glance.phoneView.v2"
     /// The camera is ready to turn on for a scan (it is off between scans).
     var cameraReady = false
     private var cameraOn = false
@@ -69,7 +57,7 @@ final class AppModel {
     var cameraIdleSeconds: Double = 12
     /// What the glasses camera is doing until it delivers frames ("waiting for the glasses", "paused"…).
     var cameraStatus = ""
-    /// The newest glasses camera frame, for the phone's Camera view (about 15 a second).
+    /// The newest glasses camera frame, for the phone's camera tile (at most 15 a second).
     var cameraPreview: UIImage?
     private var lastPreview = Date.distantPast
     private var uploading = false
@@ -125,7 +113,7 @@ final class AppModel {
             let now = Date()
             self.lastFrameAt = now
             self.lensBridge.receiveFrame(jpeg, width: w, height: h)
-            if self.phoneView == .camera, now.timeIntervalSince(self.lastPreview) >= 1.0 / 15 {
+            if now.timeIntervalSince(self.lastPreview) >= 1.0 / 15 {
                 self.lastPreview = now
                 self.cameraPreview = UIImage(data: jpeg)
             }

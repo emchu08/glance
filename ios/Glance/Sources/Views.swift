@@ -2,7 +2,8 @@ import SwiftUI
 import WebKit
 
 /// The phone half of Glance: connects the glasses on launch and draws the Glance screens on them. Their
-/// camera turns on only while a scan wants pictures. The phone shows the same Glance screens, or the camera.
+/// camera turns on only while a scan wants pictures. The phone shows the glasses camera and the Glance
+/// screens side by side; tapping the screens drives the glasses, so a guide can lead without the Neural Band.
 struct LauncherView: View {
     @Environment(AppModel.self) private var model
     private let blue = Color(red: 0.16, green: 0.39, blue: 0.91)
@@ -10,6 +11,8 @@ struct LauncherView: View {
     var body: some View {
         @Bindable var model = model
         GeometryReader { geometry in
+            let landscape = geometry.size.width > geometry.size.height
+            let maxWidth: CGFloat = landscape ? 1100 : 620
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack {
@@ -23,20 +26,7 @@ struct LauncherView: View {
                         }.accessibilityIdentifier("phone-wallet")
                     }.foregroundStyle(blue)
 
-                    Picker("On this phone", selection: $model.phoneView) {
-                        ForEach(AppModel.PhoneView.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("phone-view")
-
-                    // The lens always renders (the glasses' picture is taken from it); the camera covers it.
-                    ZStack {
-                        LensRuntimeView()
-                            .accessibilityIdentifier("live-lens")
-                        if model.phoneView == .camera { CameraPreview() }
-                    }
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    LiveSplit(width: min(geometry.size.width, maxWidth) - 40, landscape: landscape, blue: blue)
 
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         VStack(alignment: .leading, spacing: 14) {
@@ -50,7 +40,7 @@ struct LauncherView: View {
                     DetailsCard()
                 }
                 .padding(20)
-                .frame(maxWidth: 620)
+                .frame(maxWidth: maxWidth)
                 .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
             }
         }
@@ -58,6 +48,55 @@ struct LauncherView: View {
         .preferredColorScheme(.light)
         .sheet(isPresented: $model.showWallet, onDismiss: { model.lensBridge.walletReturned() }) {
             WalletView()
+        }
+    }
+}
+
+/// The glasses camera and the Glance screens next to each other, never on top of each other.
+/// The screens get the wider share in portrait so their text stays readable; landscape splits evenly.
+private struct LiveSplit: View {
+    let width: CGFloat
+    let landscape: Bool
+    let blue: Color
+    var body: some View {
+        let spacing: CGFloat = 12
+        let cameraSide = ((width - spacing) * (landscape ? 0.5 : 0.42)).rounded(.down)
+        let lensSide = width - spacing - cameraSide
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: spacing) {
+                Panel(title: "Glasses camera", systemImage: "video", blue: blue) {
+                    CameraPreview()
+                }
+                .frame(width: cameraSide)
+                Panel(title: "Glance · tap to control", systemImage: "hand.tap", blue: blue) {
+                    LensRuntimeView().accessibilityIdentifier("live-lens")
+                }
+                .frame(width: lensSide)
+            }
+            if !landscape {
+                Label("Turn your phone sideways for a bigger view.", systemImage: "rectangle.landscape.rotate")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// A titled square tile.
+private struct Panel<Content: View>: View {
+    let title: String
+    let systemImage: String
+    let blue: Color
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // One fixed title height, so different symbols never shift one square below the other.
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold)).foregroundStyle(blue)
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: 20, maxHeight: 20, alignment: .leading)
+            content()
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
         }
     }
 }
@@ -79,7 +118,7 @@ private struct ConnectionLine: View {
     }
 }
 
-/// The glasses camera, live. The Glance screens keep running underneath and on the glasses.
+/// The glasses camera, live. It sits beside the Glance screens and never covers them.
 private struct CameraPreview: View {
     @Environment(AppModel.self) private var model
     var body: some View {
@@ -89,8 +128,8 @@ private struct CameraPreview: View {
                 if let image = model.cameraPreview, model.cameraLive {
                     Image(uiImage: image).resizable().scaledToFill()
                 } else {
-                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Connecting the glasses…" : "Glasses camera off") : "Camera \(model.cameraStatus)", systemImage: "video.slash")
-                        .font(.callout).foregroundStyle(.white.opacity(0.7))
+                    Label(model.cameraStatus.isEmpty ? (model.isLaunching ? "Connecting the glasses…" : "Camera off until a scan") : "Camera \(model.cameraStatus)", systemImage: "video.slash")
+                        .font(.caption).foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center).padding()
                 }
             }
