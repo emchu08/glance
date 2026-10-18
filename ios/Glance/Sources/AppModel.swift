@@ -56,10 +56,17 @@ final class AppModel {
     var launchStatus = "Connecting to your glasses…"
     var showWallet = false
     var isLaunching = false
-    var phoneView: PhoneView = PhoneView(rawValue: UserDefaults.standard.string(forKey: AppModel.phoneViewKey) ?? "") ?? .camera {
+    var phoneView: PhoneView = PhoneView(rawValue: UserDefaults.standard.string(forKey: AppModel.phoneViewKey) ?? "") ?? .glance {
         didSet { UserDefaults.standard.set(phoneView.rawValue, forKey: AppModel.phoneViewKey) }
     }
-    private static let phoneViewKey = "glance.phoneView.v1"
+    /// v2: the camera is off between scans, so the phone shows Glance unless asked for the camera.
+    private static let phoneViewKey = "glance.phoneView.v2"
+    /// The camera is ready to turn on for a scan (it is off between scans).
+    var cameraReady = false
+    private var cameraOn = false
+    private var cameraIdle: Task<Void, Never>?
+    /// How long the camera stays on after the last picture a scan asked for (Grocery asks every few seconds).
+    var cameraIdleSeconds: Double = 12
     /// What the glasses camera is doing until it delivers frames ("waiting for the glasses", "paused"…).
     var cameraStatus = ""
     /// The newest glasses camera frame, for the phone's Camera view (about 15 a second).
@@ -79,9 +86,9 @@ final class AppModel {
     let transport: GlassesTransport
     let lensBridge = LensBridge()
 
-    init() {
+    init(transport: GlassesTransport? = nil) {
         relay = RelayClient(baseURL: Config.apiBase, code: Config.relayCode)
-        transport = GlassesTransportFactory.make()
+        self.transport = transport ?? GlassesTransportFactory.make()
     }
 
     var cameraLive: Bool { lastFrameAt.map { Date().timeIntervalSince($0) < 2.5 } ?? false }
@@ -101,7 +108,10 @@ final class AppModel {
             if state == .idle, previous == .registering, self.wantsLaunch {
                 self.reportError("Registration was canceled. Tap Reconnect to try again.")
             }
-            if state == .sessionExpired || state == .idle { self.lensBridge.clearCamera(); self.lastFrameAt = nil }
+            if state == .sessionExpired || state == .idle {
+                self.lensBridge.clearCamera(); self.lastFrameAt = nil
+                self.cameraReady = false; self.cameraOn = false; self.cameraIdle?.cancel()
+            }
             if state == .sessionExpired { self.reportError("Glasses disconnected. Tap Reconnect.") }
         }
         transport.onCapabilities = { [weak self] c in Task { @MainActor in self?.capabilities = c; self?.log("Capabilities: camera=\(c.camera), display=\(c.display), controls=\(c.input)") } }
@@ -132,6 +142,7 @@ final class AppModel {
             }
         }
         lensBridge.onWallet = { [weak self] in self?.showWallet = true }
+        lensBridge.onCameraDemand = { [weak self] in self?.cameraDemanded() }
         transport.onError = { [weak self] message in self?.reportError(message) }
         transport.onControl = { [weak self] control, state in self?.lensBridge.control(control, displayed: state) }
         lensBridge.onError = { [weak self] message in self?.reportError(message) }
@@ -149,7 +160,7 @@ final class AppModel {
         log("started · api \(apiBase.absoluteString) · transport \(transport.name)")
     }
 
-    /// Connects on launch: the camera first, so frames flow before anything else is ready.
+    /// Connects on launch: the Glance screens first, then the camera, which stays off until a scan.
     func openGlance() async {
         guard !isLaunching else { return }
         await start()
@@ -183,8 +194,10 @@ final class AppModel {
             try await transport.startDisplay()
             lensBridge.refresh()
             guard wantsLaunch else { return }
-            launchStatus = "Starting the glasses camera…"
+            launchStatus = "Getting the glasses camera ready…"
             try await transport.startCamera()
+            cameraReady = true
+            lensBridge.setCameraStandby(true)
             guard wantsLaunch else { return }
             lensBridge.refresh()
             registrationDeadline?.cancel()
@@ -192,6 +205,24 @@ final class AppModel {
             isLaunching = false
             wantsLaunch = false
         } catch { reportError(error.localizedDescription) }
+    }
+
+    /// A scan asked for a picture: turn the camera on, and off again once scans stop asking.
+    func cameraDemanded() {
+        guard cameraReady else { return }
+        cameraIdle?.cancel()
+        if !cameraOn {
+            cameraOn = true
+            log("camera on for a scan")
+            Task { do { try await transport.resumeCamera() } catch { self.cameraOn = false; self.reportError(error.localizedDescription) } }
+        }
+        cameraIdle = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(self?.cameraIdleSeconds ?? 12)) } catch { return }
+            guard let self, self.cameraOn else { return }
+            self.cameraOn = false
+            self.transport.pauseCamera()
+            self.log("camera off (no scan for \(Int(self.cameraIdleSeconds)) s)")
+        }
     }
 
     func reportError(_ message: String) {
