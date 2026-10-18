@@ -13,7 +13,7 @@ import { formatCents } from "@/domain/money";
 import { useLens } from "./LensProvider";
 import { LIST_WINDOW } from "./reducer";
 import { COMPOSER_KEYS, currentOffer, isPayable, visibleWindow } from "./screens";
-import { MODE_META, type LensAction, type LensState } from "./types";
+import { type LensAction, type LensState } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Shared primitives
@@ -189,12 +189,18 @@ function Picker() {
   const modes = actions.filter((a) => a.id.startsWith("mode-"));
   const selected = Math.max(0, modes.findIndex((a) => a.id === focusId));
   const reduced = state.reducedMotion;
+  const source = state.pairing.status === "none"
+    ? (state.capture === "sample" ? "Sample scenario" : state.capture === "webcam" ? "Camera" : "Glasses")
+    : `Glasses ${state.pairing.status === "connected" ? "connected" : state.pairing.status === "waiting" ? `· pair code ${state.pairing.code ?? "…"}` : `· ${state.pairing.status}`}`;
   return (
     <div className="lens-wheel" aria-label="Choose a mode">
+      <div className="lens-picker-top" aria-hidden>
+        <span className="lens-picker-mark">glance</span>
+        <span>↑↓ · select</span>
+      </div>
       {modes.map((a, i) => {
         const offset = i - selected;
         const isSel = offset === 0;
-        const mode = a.id.replace("mode-", "") as keyof typeof MODE_META;
         return (
           <motion.button
             key={a.id}
@@ -202,23 +208,23 @@ function Picker() {
             className={clsx("lens-wheel-row", isSel && "is-focused")}
             data-action-id={a.id}
             onClick={() => activate(a.id)}
-            animate={{ top: 300 - 64 + offset * 128, scale: isSel ? 1 : 0.62, opacity: isSel ? 1 : Math.abs(offset) === 1 ? 0.45 : 0.25, rotateX: offset * -28 }}
+            animate={{ top: WHEEL_CENTER - WHEEL_ROW / 2 + offset * WHEEL_STEP, scale: isSel ? 1 : 0.62, opacity: isSel ? 1 : Math.abs(offset) === 1 ? 0.55 : 0.25, rotateX: offset * -28 }}
             transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
-            style={{ color: isSel ? MODE_META[mode].color : "#fff" }}
           >
             <span className="lens-wheel-label">{a.label}</span>
             {isSel && <span className="lens-wheel-hint">{a.hint}</span>}
           </motion.button>
         );
       })}
-      <div className="lens-status" style={{ justifyContent: "center", bottom: 36, height: 30 }}>
-        {state.pairing.status === "none"
-          ? (state.capture === "sample" ? "Sample scenario · ↑↓ then select" : state.capture === "webcam" ? "Camera · ↑↓ then select" : "Glasses · ↑↓ then select")
-          : `Glasses ${state.pairing.status === "connected" ? "connected" : state.pairing.status === "waiting" ? `· pair code ${state.pairing.code ?? "…"}` : `· ${state.pairing.status}`}`}
-      </div>
+      <div className="lens-status lens-picker-source">{source}</div>
     </div>
   );
 }
+
+/** Wheel geometry on the 600 px lens: the selected row is the outlined box, neighbours tilt away. */
+const WHEEL_CENTER = 298;
+const WHEEL_ROW = 164;
+const WHEEL_STEP = 128;
 
 // ── Glimpse ──────────────────────────────────────────────────────────────────
 

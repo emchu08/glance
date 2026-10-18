@@ -372,3 +372,17 @@
 .lens [data-action-id].is-focused { background: #fff !important; color: #123b64 !important; }
 .lens [data-action-id].is-focused .lens-row-hint,
 .lens [data-action-id].is-focused .lens-row-aside { color: #2a527a !important; }
+
+/* Mode picker: a transparent outlined box over the world, neighbours tilted away.
+   Black emits nothing on the display, so the box adds only its outline and glow. */
+.lens-wheel .lens-wheel-row { left: 107px; right: 107px; height: 164px; border-radius: 26px; color: #fff !important; }
+.lens .lens-wheel-row.is-focused { background: transparent !important; color: #fff !important; outline: none !important; }
+.lens .lens-wheel-row.is-focused::after {
+  inset: 0; border-radius: 26px; border: 3px solid #fff;
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.45), inset 0 0 18px rgba(255, 255, 255, 0.1);
+}
+.lens-wheel .lens-wheel-label { font-size: 72px; line-height: 1; font-weight: 700; letter-spacing: -0.035em; white-space: nowrap; }
+.lens-wheel .lens-wheel-hint { font-size: 24px; font-weight: 500; letter-spacing: -0.005em; color: #b9d7fb; margin-top: 10px; }
+.lens-picker-top { position: absolute; top: 34px; left: 38px; right: 38px; display: flex; align-items: baseline; justify-content: space-between; font-size: 19px; color: rgba(255, 255, 255, 0.72); }
+.lens-picker-mark { font-family: var(--font-garamond), "EB Garamond", Georgia, serif; font-size: 36px; line-height: 1; letter-spacing: -0.01em; color: rgba(255, 255, 255, 0.86); }
+.lens-picker-source { justify-content: center; bottom: 36px; height: 30px; font-size: 19px; color: rgba(255, 255, 255, 0.72); }
