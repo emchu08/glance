@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Glasses } from "lucide-react";
 
-/** Smaller primary CTA that floats top-right once the hero CTA leaves the viewport. */
+/** Repeats the hero's primary action, under the same name, once that button scrolls away. */
 export function FloatingCta() {
   const [show, setShow] = useState(false);
   useEffect(() => {
@@ -18,8 +17,10 @@ export function FloatingCta() {
   return (
     <AnimatePresence>
       {show && (
-        <motion.div initial={{ opacity: 0, y: -12, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.98 }} transition={{ type: "spring", duration: 0.4, bounce: 0 }} className="fixed right-4 top-4 z-50">
-          <Link href="/connect" className="cta-blue inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-semibold shadow-lg"><Glasses size={16} /> Connect glasses</Link>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.22, ease: "easeOut" }} className="fixed bottom-5 right-5 z-50">
+          <Link href="/demo" className="cta-lit inline-flex rounded-full px-5 py-2.5 text-[14px] font-semibold">
+            Open the live demo
+          </Link>
         </motion.div>
       )}
     </AnimatePresence>

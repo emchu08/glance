@@ -1,161 +1,318 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { Glasses, Hand, Lock, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/marketing/Brand";
 import { FloatingCta } from "@/components/marketing/FloatingCta";
-import { HeroViewport } from "@/components/marketing/HeroViewport";
-import { SignalBars } from "@/components/marketing/SignalBars";
+import { GlassesStage } from "@/components/marketing/GlassesStage";
 
 export const metadata: Metadata = { title: { absolute: "Glance — Buy with your eyes" } };
-export const viewport: Viewport = { themeColor: "#3d7bd6", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#14120c", colorScheme: "dark" };
 
-const SAVES = [
-  { name: "Nike Zoom Vomero 5", price: "$129", store: "StockX", when: "Today", where: "Capitol Hill, Seattle", tone: "bg-gradient-to-br from-stone-200 to-stone-400" },
-  { name: "New Balance 530", price: "$74.99", store: "Zappos", when: "Today", where: "Capitol Hill, Seattle", tone: "bg-gradient-to-br from-slate-100 to-slate-300" },
-  { name: "Arc'teryx Atom Hoody", price: "$280", store: "REI", when: "Sat", where: "Discovery Park", tone: "bg-gradient-to-br from-red-500 to-red-700" },
-  { name: "RXBAR Chocolate Sea Salt", price: "$2.17", store: "Amazon", when: "Thu", where: "PCC Community Markets", tone: "bg-gradient-to-br from-amber-700 to-amber-900" },
+/** Offers as they appear in src/data/glimpse.ts, so the page shows what the lens actually returns. */
+const SWEATER_OFFERS = [
+  { retailer: "Temu", price: "$10.99", note: "gray, knit" },
+  { retailer: "Target", price: "$25.00", note: "gray, crew neck" },
+  { retailer: "Uniqlo", price: "$29.90", note: "gray, crew neck, knit" },
+  { retailer: "Gap", price: "$49.95", note: "heather gray, crew neck" },
+];
+
+/** The connected sandbox seller from src/data/merchant.ts — the only in-lens checkout path. */
+const BUYABLE = [
+  { name: "Gray canvas tote", price: "$12.00" },
+  { name: "Tomatoes, 300 g", price: "$3.20" },
+  { name: "Rigatoni, 500 g", price: "$2.80" },
+];
+
+const MODES = [
+  {
+    name: "Glimpse",
+    tint: "var(--color-glimpse)",
+    job: "Look at something and get a price.",
+    body: "Linger on a product and Glance names it, then lines up what it costs elsewhere. In the sample street frame it reads a gray crewneck sweater at 90% confidence and returns four sellers, cheapest first.",
+  },
+  {
+    name: "Grocery",
+    tint: "var(--color-grocery)",
+    job: "Watch the cart fill and keep the total honest.",
+    body: "It samples the cart every three seconds while scanning is on, ticks items off your list as they go in, and flags the unit price, the aisle, and what the nutrition label says before you commit.",
+  },
+  {
+    name: "Gourmet",
+    tint: "var(--color-gourmet)",
+    job: "Turn a dish into a shoppable list.",
+    body: "Point at a plate of fettuccine and get three recipes you can actually cook. Pick one and its ingredients land on a shared list, deduplicated against what the Grocery mode already saw in your cart.",
+  },
+];
+
+const STATUS = [
+  { what: "Buying in the lens with a saved card", state: "Working", detail: "End to end in the Stripe sandbox, with the test Visa" },
+  { what: "Accounts, wallet, and order history", state: "Working", detail: "Supabase, with row-level security applied in migrations" },
+  { what: "Seller commission on each order", state: "Working", detail: "Booked per order at 10% of the item subtotal" },
+  { what: "Auto-buy rules with a spending cap", state: "Built", detail: "Set a ceiling and Glance stops asking under it" },
+  { what: "Sponsored listings and attribution", state: "Built", detail: "Signed attribution tokens, sandbox billing only" },
+  { what: "Recognition on live camera frames", state: "Built", detail: "Runs server-side; sample mode never calls a paid model" },
+  { what: "Native iOS companion app", state: "Scaffolded", detail: "Builds from ios/, not yet verified on real glasses" },
 ];
 
 export default function Home() {
   return (
-    <main className="light-page bg-white text-ink">
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden" style={{ background: "linear-gradient(180deg,#3d7bd6 0%,#5f97e3 28%,#8dbdef 50%,#c9def6 68%,#eef4fc 82%,#ffffff 100%)" }}>
-        <div className="dot-grid pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(60%_50%_at_50%_30%,#000,transparent)]" />
-        <div className="pointer-events-none absolute left-0 right-0 top-[38%] h-24 bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute left-0 right-0 top-[52%] h-px bg-white/40" />
-        <Brackets />
-        <nav className="absolute inset-x-0 top-0 z-10 mx-auto flex h-20 max-w-[1152px] items-center justify-between px-6">
-          <Link href="/" aria-label="Glance home"><Wordmark light /></Link>
-          <div className="hidden items-center gap-7 text-[15px] font-medium text-white/90 md:flex">
-            <Link href="/#how-it-helps" className="hover:text-white">How it works</Link>
-            <Link href="/demo" className="hover:text-white">Live demo</Link>
-            <Link href="/glasses" className="hover:text-white">Glasses view</Link>
-          </div>
-        </nav>
-        <div className="relative mx-auto max-w-[1152px] px-6 pb-16 pt-[104px] md:min-h-[696px] md:pt-[150px]">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur"><span className="h-2 w-2 rounded-full bg-white" /> Made for Meta glasses</span>
-            <h1 className="display mt-6 text-white">Buy with your eyes</h1>
-            <p className="mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-white/90">See something you love. Compare it, choose it, and buy eligible items with your saved Visa card, right inside your glasses.</p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link id="hero-cta" href="/connect" className="cta-blue inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-semibold"><Glasses size={18} /> Connect glasses</Link>
-              <Link href="/demo" className="inline-flex items-center rounded-full border border-white/50 bg-white/10 px-6 py-3.5 text-[15px] font-semibold text-white backdrop-blur hover:bg-white/20">Try the demo</Link>
+    <main className="optical-page">
+      {/* ── Hero: the frame itself, lit from the left ───────────────────── */}
+      <section className="relative isolate min-h-[92svh] overflow-hidden bg-obsidian">
+        <GlassesStage />
+
+        <div className="relative z-10 mx-auto flex min-h-[92svh] max-w-[1180px] flex-col px-6">
+          <nav className="flex h-20 items-center justify-between">
+            <Link href="/" aria-label="Glance home" className="text-bone">
+              <Wordmark light />
+            </Link>
+            <div className="hidden items-center gap-8 text-[15px] text-bone/70 md:flex">
+              <Link href="/demo" className="hover:text-bone">Live demo</Link>
+              <Link href="/glasses" className="hover:text-bone">Wearer preview</Link>
+              <Link href="#status" className="hover:text-bone">What&rsquo;s built</Link>
             </div>
-            <Link href="/glasses" className="mt-4 inline-block text-[14px] text-white/80 underline-offset-4 hover:underline">Preview the in-lens view</Link>
+          </nav>
+
+          {/* Clears the phone-only model band above; from md up the model is beside this. */}
+          <div className="flex flex-1 items-center pb-14 pt-[244px] md:py-20 md:pt-20">
+            <div className="max-w-[42rem]">
+              <h1 className="display text-bone">Buy with your eyes</h1>
+              <p className="measure-tight mt-7 text-[19px] leading-relaxed text-bone/75">
+                Glance runs in the right lens of your glasses. Look at something, see
+                what it costs, and pay with a saved card without taking out your phone.
+              </p>
+              <div className="mt-9 flex flex-wrap items-center gap-3">
+                <Link id="hero-cta" href="/demo" className="cta-lit rounded-full px-7 py-3.5 text-[15px] font-semibold">
+                  Open the live demo
+                </Link>
+                <Link href="/connect" className="cta-quiet rounded-full px-7 py-3.5 text-[15px] font-medium">
+                  Connect your glasses
+                </Link>
+              </div>
+              <p className="mt-6 text-[14px] text-bone/60">
+                Payments run in the Stripe sandbox. Nothing on this page charges a real card.
+              </p>
+            </div>
           </div>
-          <HeroViewport />
+
+          {/* The lens is square and small; stating its real size sets expectations. */}
+          <div className="flex flex-wrap items-baseline gap-x-10 gap-y-3 border-t border-graphite-soft py-6 text-[14px] text-bone/55">
+            <span className="readout">600 × 600 lens, one eye</span>
+            <span className="readout">Recognition in about 600 ms</span>
+            <span className="readout">Three modes, one wallet</span>
+            <span className="readout">Built at DubHacks 2026</span>
+          </div>
         </div>
       </section>
+
       <FloatingCta />
 
-      {/* ── 1. How Glance helps ──────────────────────────────────────────── */}
-      <section id="how-it-helps" className="mx-auto max-w-[1152px] px-6 py-16 md:py-28">
-        <h2 className="text-center font-serif text-4xl tracking-tight md:text-5xl">How Glance helps while you shop</h2>
-        <div className="mt-12 grid gap-6 md:grid-cols-2">
-          <article className="relative overflow-hidden rounded-[32px] p-8 text-white" style={{ background: "linear-gradient(160deg,#7f9cf3,#6488ee)" }}>
-            <div className="rounded-[20px] border border-white/25 bg-black/15 p-5 backdrop-blur">
-              <div className="flex items-center justify-between text-[12px] uppercase tracking-wider text-white/80"><span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-sm border border-white/80" /> Identifying</span><span>94% signal</span></div>
-              <div className="mt-4 text-[26px] font-semibold tracking-tight">Nike Zoom Vomero 5</div>
-              <SignalBars />
-            </div>
-            <h3 className="mt-8 text-2xl font-semibold tracking-tight">Glance sees what you’re looking at</h3>
-            <p className="mt-2 text-white/85">It recognizes products the moment you linger, so the answer is ready before you ask.</p>
-          </article>
-          <article className="rounded-[32px] bg-mist p-8">
-            <div className="rounded-[20px] border border-rule bg-white p-5 shadow-sm">
-              <div className="inline-flex items-center gap-2 rounded-full bg-mist px-3 py-1 text-[12px] font-medium text-ink-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-action" /> Listening</div>
-              <p className="mt-3 text-[17px] font-medium">“Where is it cheapest?”</p>
-              <ul className="mt-3 divide-y divide-rule text-[15px]">
-                {[["StockX", "$129", true], ["GOAT", "$138"], ["Foot Locker", "$149.99"], ["Nike", "$160"]].map(([s, p, best]) => <li key={s as string} className="flex items-center justify-between py-2"><span>{s}</span><span className="font-medium">{p}{best ? <span className="ml-2 rounded-full bg-best/30 px-2 py-0.5 text-[11px] text-green-900">best</span> : null}</span></li>)}
+      {/* ── A single purchase, in the four steps it actually takes ──────── */}
+      <section className="mx-auto max-w-[1180px] px-6 pb-20 pt-20 md:pb-28 md:pt-28">
+        <div className="max-w-[46rem]">
+          <h2 className="headline text-warm-ink">One purchase, start to finish</h2>
+          <p className="measure mt-4 text-[17px] leading-relaxed text-warm-muted">
+            This is the gray canvas tote from the seeded sandbox seller, bought without
+            leaving the lens. Four steps, in the order they happen.
+          </p>
+        </div>
+
+        <ol className="mt-14 grid gap-px overflow-hidden rounded-lg bg-bone-deep sm:grid-cols-2 lg:grid-cols-4">
+          <Step n={1} title="You linger" caption="Recognised, 90% confident">
+            <LensTile>
+              {/* The box is the candidate's real frame coordinates from src/data/glimpse.ts. */}
+              <div
+                className="absolute rounded-sm border border-waveguide"
+                style={{ left: "43%", top: "56%", width: "20%", height: "30%" }}
+              />
+              <div className="absolute left-5 right-5 top-5">
+                <span className="readout text-[11px] text-waveguide">90%</span>
+                <p className="mt-1 text-[13px] leading-snug text-bone/85">Gray crewneck sweater</p>
+              </div>
+            </LensTile>
+          </Step>
+
+          <Step n={2} title="It prices it" caption="Four sellers, cheapest first">
+            <LensTile>
+              <ul className="absolute inset-5 flex flex-col justify-center gap-2">
+                {SWEATER_OFFERS.map((o, i) => (
+                  <li key={o.retailer} className="flex items-baseline justify-between text-[12px]">
+                    <span className={i === 0 ? "text-waveguide" : "text-bone/55"}>{o.retailer}</span>
+                    <span className={`readout ${i === 0 ? "text-waveguide" : "text-bone/55"}`}>{o.price}</span>
+                  </li>
+                ))}
               </ul>
-              <div className="mt-4 flex flex-wrap gap-2 text-[13px]">{["Identify", "Similar", "Compare prices", "Save"].map((c) => <span key={c} className="rounded-full border border-rule px-3 py-1 text-ink-muted">{c}</span>)}</div>
-              <p className="mt-3 text-[12px] text-ink-subtle">Ask about what you’re looking at, or pinch to save.</p>
-            </div>
-            <h3 className="mt-8 text-2xl font-semibold tracking-tight">When you want more, Glance shops for you</h3>
-            <p className="mt-2 text-ink-muted">Ask out loud, like ‘under $80’ or ‘where is it cheapest?’, and the answer shows up in your lens.</p>
-          </article>
-        </div>
+            </LensTile>
+          </Step>
+
+          <Step n={3} title="You confirm" caption="One quote, held for 90 seconds">
+            <LensTile>
+              <div className="absolute inset-5 flex flex-col justify-center">
+                <span className="text-[12px] text-bone/50">Gray canvas tote</span>
+                <span className="readout mt-1 text-[30px] font-semibold leading-none text-bone">$12.00</span>
+                <span className="mt-4 inline-flex w-fit rounded-full bg-waveguide px-4 py-1.5 text-[12px] font-semibold text-obsidian">
+                  Buy $12.00
+                </span>
+              </div>
+            </LensTile>
+          </Step>
+
+          <Step n={4} title="It&rsquo;s charged" caption="Saved Visa, 10% to Glance">
+            <LensTile>
+              <div className="absolute inset-5 flex flex-col justify-center gap-2">
+                <span className="readout text-[13px] text-coating">Paid · Visa 4242</span>
+                <span className="text-[12px] leading-relaxed text-bone/55">
+                  Order written, commission booked, receipt in your history.
+                </span>
+              </div>
+            </LensTile>
+          </Step>
+        </ol>
+
+        <p className="mt-6 text-[14px] text-warm-subtle">
+          Only the connected sandbox seller can be bought in the lens: {BUYABLE.map((b) => `${b.name} at ${b.price}`).join(", ")}.
+          Everything else opens as a link on your phone.
+        </p>
       </section>
 
-      {/* ── 2. Your wardrobe, saved ──────────────────────────────────────── */}
-      <section className="mx-auto max-w-[1152px] px-6 pb-16 md:pb-28">
-        <div className="rounded-[36px] p-6 md:p-12" style={{ background: "linear-gradient(160deg,#c4cae6,#e6e9f5)" }}>
-          <div className="text-center"><h2 className="font-serif text-4xl tracking-tight md:text-5xl">Your wardrobe, saved</h2><p className="mx-auto mt-3 max-w-xl text-ink-muted">Everything you save with a glance lands in the Glance app, with the best price attached.</p></div>
-          <div className="relative mx-auto mt-10 max-w-3xl overflow-hidden rounded-[20px] border border-white/60 bg-white shadow-xl">
-            <div className="flex items-center gap-2 border-b border-rule px-4 py-3"><span className="h-3 w-3 rounded-full bg-[#ff5f57]" /><span className="h-3 w-3 rounded-full bg-[#febc2e]" /><span className="h-3 w-3 rounded-full bg-[#28c840]" /><span className="ml-3 flex-1 rounded-md bg-mist px-3 py-1 text-[13px] text-ink-subtle">Search your saves</span><span className="rounded-full bg-best/30 px-2 py-0.5 text-[11px] font-medium text-green-900">Glance on</span></div>
-            <div className="p-5">
-              <div className="flex items-center justify-between"><div><div className="text-[12px] uppercase tracking-wider text-ink-subtle">This week</div><div className="text-lg font-semibold">Saved from your glasses</div></div><div className="flex gap-1 text-[12px]">{["All", "Sneakers", "Outerwear", "Food"].map((c, i) => <span key={c} className={i === 0 ? "rounded-full bg-ink px-2.5 py-1 text-white" : "rounded-full border border-rule px-2.5 py-1 text-ink-muted"}>{c}</span>)}</div></div>
-              <ul className="mt-4 grid gap-3 sm:grid-cols-2">{SAVES.map((s) => <li key={s.name} className="flex items-center gap-3 rounded-2xl border border-rule p-3"><span className={`h-14 w-14 flex-none rounded-xl ${s.tone}`} /><div className="min-w-0"><div className="truncate font-medium">{s.name}</div><div className="text-[13px] text-ink-muted">{s.price} at {s.store}</div><div className="text-[12px] text-ink-subtle">{s.when} · {s.where}</div></div></li>)}</ul>
-            </div>
-            <div className="absolute bottom-4 right-4 flex gap-2 text-[13px]"><span className="rounded-full bg-ink px-3 py-1.5 text-white shadow">Resume shopping</span><span className="rounded-full border border-rule bg-white px-3 py-1.5 shadow">Ask Glance about your saves</span></div>
+      {/* ── Three modes: a parallel set, so no step numbers ─────────────── */}
+      <section className="border-y border-bone-deep bg-bone">
+        <div className="mx-auto max-w-[1180px] px-6 py-20 md:py-28">
+          <h2 className="headline max-w-[34rem] text-warm-ink">Three ways of looking</h2>
+          <div className="mt-14 grid gap-12 md:grid-cols-3 md:gap-10">
+            {MODES.map((mode) => (
+              <article key={mode.name} className="border-t-2 pt-5" style={{ borderColor: mode.tint }}>
+                <h3 className="text-[22px] font-semibold tracking-tight text-warm-ink">{mode.name}</h3>
+                <p className="mt-1.5 text-[17px] font-medium text-warm-ink">{mode.job}</p>
+                <p className="mt-3 text-[15px] leading-relaxed text-warm-muted">{mode.body}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── 3. Built for the glasses you already wear ────────────────────── */}
-      <section className="mx-auto max-w-[1152px] px-6 pb-16 md:pb-28">
-        <h2 className="text-center font-serif text-4xl tracking-tight md:text-5xl">Built for the glasses you already wear</h2>
-        <p className="mt-3 text-center text-ink-muted">Made for a screen that sits in your lens, not in your hand.</p>
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
-          <Card icon={<Lock size={18} />} title="Private to you.">
-            <div className="grid grid-cols-2 overflow-hidden rounded-2xl">
-              <div className="relative aspect-[4/5] bg-[url('/samples/street.svg')] bg-cover bg-center"><span className="absolute left-[38%] top-[48%] h-[30%] w-[32%] rounded border-2 border-white" /><span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white">96%</span><span className="absolute bottom-2 left-2 text-[11px] text-white/90">Wearer</span></div>
-              <div className="relative aspect-[4/5] bg-[url('/samples/street.svg')] bg-cover bg-center"><span className="absolute bottom-2 left-2 text-[11px] text-white/90">Bystander</span></div>
-            </div>
-            <p className="mt-4 text-ink-muted">Only you see what Glance sees. No identity, no eye tracking, nothing saved unless you ask.</p>
-          </Card>
-          <Card icon={<Hand size={18} />} title="Hands-free by design.">
-            <div className="rounded-2xl bg-mist p-4">
-              <ul className="space-y-2 text-[15px] font-medium">{["Save", "Similar styles", "Compare prices"].map((m, i) => <li key={m} className={i === 0 ? "rounded-xl bg-white px-3 py-2 shadow-sm" : "px-3 py-2 text-ink-muted"}>{m}</li>)}</ul>
-              <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[11px] text-ink-subtle">{["Pinch", "Swipe", "Tap", "Voice"].map((g) => <span key={g}><span className="mx-auto mb-1 block h-8 w-8 rounded-full border border-rule bg-white" />{g}</span>)}</div>
-            </div>
-            <p className="mt-4 text-ink-muted">Temple swipes and a pinch do the work. Illustrative controls; the web app never asks for your microphone.</p>
-          </Card>
-          <Card icon={<Sparkles size={18} />} title="Remembers your taste.">
-            <div className="rounded-2xl border border-rule p-4 text-[13px]">
-              <div className="flex items-center justify-between"><span className="font-medium">Your taste profile</span><span className="text-ink-subtle">Learned from 24 saves</span></div>
-              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-ink-muted"><dt>Budget</dt><dd className="text-ink">$60–120</dd><dt>Shoe size</dt><dd className="text-ink">US 10</dd><dt>Top</dt><dd className="text-ink">M</dd><dt>Colors</dt><dd className="text-ink">Neutral, earth</dd><dt>Brands</dt><dd className="text-ink">New Balance, ASICS, Nike</dd><dt>Diet</dt><dd className="text-ink">Gluten-free</dd></dl>
-              <p className="mt-3 rounded-xl bg-mist p-3 text-ink">New Balance 530 matches Alex’s size and neutral style, and fits the budget.</p>
-            </div>
-            <p className="mt-4 text-ink-muted">A sample profile, not an editable account page.</p>
-          </Card>
+      {/* ── The honest list ────────────────────────────────────────────── */}
+      <section id="status" className="mx-auto max-w-[1180px] px-6 py-20 md:py-28">
+        <div className="max-w-[46rem]">
+          <h2 className="headline text-warm-ink">What&rsquo;s actually built</h2>
+          <p className="measure mt-4 text-[17px] leading-relaxed text-warm-muted">
+            A hackathon demo is easy to oversell, so here is the real state of it.
+            Working means it runs end to end in the sandbox. Scaffolded means the code
+            exists and the hardware check does not.
+          </p>
         </div>
+
+        <table className="mt-12 w-full border-collapse text-left">
+          <caption className="sr-only">Glance capabilities and their current state</caption>
+          <tbody>
+            {STATUS.map((row) => (
+              <tr key={row.what} className="border-t border-bone-deep align-baseline">
+                <th scope="row" className="py-5 pr-6 text-[16px] font-medium text-warm-ink">
+                  {row.what}
+                </th>
+                <td className="w-[8.5rem] py-5 pr-6">
+                  <StateBadge state={row.state} />
+                </td>
+                <td className="hidden py-5 text-[15px] leading-relaxed text-warm-muted md:table-cell">
+                  {row.detail}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
-      {/* ── 4. Connect supported Meta glasses ────────────────────────────── */}
-      <section className="mx-auto max-w-[1152px] px-6 pb-16 md:pb-28">
-        <div className="rounded-[32px] border border-rule p-8 md:p-12">
-          <h2 className="font-serif text-3xl tracking-tight md:text-4xl">Connect supported Meta glasses</h2>
-          <div className="mt-6 grid gap-6 text-[15px] text-ink-muted md:grid-cols-2">
-            <div><p className="font-medium text-ink-subtle">Display glasses · in-lens shopping</p><p className="mt-1">Meta Ray-Ban Display (verification pending on physical hardware). Shows the 600×600 lens with the right-lens display and temple input through the Glance companion.</p></div>
-            <div><p className="font-medium text-ink-subtle">Camera-only glasses · phone or laptop shows the lens</p><p className="mt-1">Ray-Ban Meta and Oakley Meta camera models send frames through the companion; the lens runs on your phone or in this browser.</p></div>
+      {/* ── Hardware ───────────────────────────────────────────────────── */}
+      <section className="bg-obsidian">
+        <div className="mx-auto grid max-w-[1180px] gap-12 px-6 py-20 md:grid-cols-[1fr_1fr] md:py-28">
+          <div>
+            <h2 className="headline text-bone">Which glasses work</h2>
+            <p className="measure mt-4 text-[17px] leading-relaxed text-bone/65">
+              Glance was written for Meta Ray-Ban Display, where the lens runs on the
+              glasses themselves. On camera-only frames it still works: the glasses send
+              frames and your phone or this browser shows the lens.
+            </p>
+            <Link href="/connect" className="cta-lit mt-8 inline-flex rounded-full px-7 py-3.5 text-[15px] font-semibold">
+              Connect your glasses
+            </Link>
           </div>
-          <p className="mt-5 text-[13px] text-ink-subtle">Tested in this build: browser preview with sample scenario and browser camera. Physical-device checks are listed in the connect page. A website button cannot install a native app; the companion is built from the repository with Xcode.</p>
-          <Link href="/connect" className="cta-blue mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-[15px] font-semibold"><Glasses size={18} /> Connect glasses</Link>
+          <dl className="divide-y divide-graphite-soft border-y border-graphite-soft">
+            <div className="py-5">
+              <dt className="text-[16px] font-medium text-bone">Meta Ray-Ban Display</dt>
+              <dd className="mt-1.5 text-[15px] leading-relaxed text-bone/60">
+                The full in-lens experience, with temple input. Not yet verified on
+                physical hardware.
+              </dd>
+            </div>
+            <div className="py-5">
+              <dt className="text-[16px] font-medium text-bone">Ray-Ban Meta and Oakley Meta</dt>
+              <dd className="mt-1.5 text-[15px] leading-relaxed text-bone/60">
+                Camera-only frames. Recognition works; the lens itself appears on your
+                phone or laptop.
+              </dd>
+            </div>
+            <div className="py-5">
+              <dt className="text-[16px] font-medium text-bone">No glasses at hand</dt>
+              <dd className="mt-1.5 text-[15px] leading-relaxed text-bone/60">
+                The demo runs on sample frames, or on your webcam if you allow it.
+              </dd>
+            </div>
+          </dl>
         </div>
       </section>
 
-      <footer className="border-t border-rule">
-        <div className="mx-auto flex max-w-[1152px] flex-col items-start gap-4 px-6 py-10 text-[14px] text-ink-muted md:flex-row md:items-center md:justify-between">
-          <Wordmark />
-          <p>Glance is a concept built at DubHacks 2026. Not affiliated with Meta.</p>
-          <div className="flex gap-5"><Link href="/demo" className="hover:text-ink">Live demo</Link><Link href="/glasses" className="hover:text-ink">Glasses view</Link><Link href="/privacy" className="hover:text-ink">Privacy</Link><Link href="/terms" className="hover:text-ink">Terms</Link></div>
+      <footer className="bg-obsidian">
+        <div className="mx-auto flex max-w-[1180px] flex-col gap-6 border-t border-graphite-soft px-6 py-10 text-[14px] text-bone/55 md:flex-row md:items-center md:justify-between">
+          <Link href="/" aria-label="Glance home" className="text-bone"><Wordmark light /></Link>
+          <p className="max-w-[26rem]">
+            A concept built at DubHacks 2026. Not affiliated with Meta, Ray-Ban, or Visa.
+          </p>
+          <div className="flex flex-wrap gap-5">
+            <Link href="/demo" className="hover:text-bone">Demo</Link>
+            <Link href="/glasses" className="hover:text-bone">Wearer preview</Link>
+            <Link href="/privacy" className="hover:text-bone">Privacy</Link>
+            <Link href="/terms" className="hover:text-bone">Terms</Link>
+          </div>
         </div>
       </footer>
     </main>
   );
 }
 
-function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return <article className="rounded-[32px] border border-rule bg-white p-6"><div className="mb-4 flex items-center gap-2 text-ink-subtle">{icon}<h3 className="text-xl font-semibold tracking-tight text-ink">{title}</h3></div>{children}</article>;
+/** A step in the purchase sequence. Numbered because this genuinely is an order. */
+function Step({ n, title, caption, children }: { n: number; title: string; caption: string; children: React.ReactNode }) {
+  return (
+    <li className="bg-bone p-5">
+      {children}
+      <div className="mt-5 flex gap-3">
+        <span className="readout shrink-0 text-[13px] font-semibold text-warm-subtle">{n}</span>
+        <div>
+          <h3 className="text-[16px] font-semibold tracking-tight text-warm-ink">{title}</h3>
+          <p className="mt-1 text-[14px] leading-snug text-warm-muted">{caption}</p>
+        </div>
+      </div>
+    </li>
+  );
 }
 
-function Brackets() {
-  const c = "absolute h-[34px] w-[34px] border-white/70 md:h-14 md:w-14";
+/** The lens is square at 600×600, so every preview keeps that ratio. */
+function LensTile({ children }: { children: React.ReactNode }) {
   return (
-    <div className="pointer-events-none absolute left-1/2 top-[104px] h-[476px] w-[calc(100vw-32px)] max-w-[1020px] -translate-x-1/2 md:top-[150px] md:h-[546px]" aria-hidden>
-      <span className={`${c} left-0 top-0 border-l-2 border-t-2`} /><span className={`${c} right-0 top-0 border-r-2 border-t-2`} /><span className={`${c} bottom-0 left-0 border-b-2 border-l-2`} /><span className={`${c} bottom-0 right-0 border-b-2 border-r-2`} />
+    <div className="relative aspect-square overflow-hidden rounded bg-obsidian">
+      {children}
     </div>
+  );
+}
+
+function StateBadge({ state }: { state: string }) {
+  const tone =
+    state === "Working"
+      ? "border-waveguide-deep/40 bg-waveguide/25 text-[#1d5d50]"
+      : state === "Built"
+        ? "border-bone-deep bg-bone-deep/60 text-warm-muted"
+        : "border-coating/35 bg-coating/15 text-[#7a4f11]";
+  return (
+    <span className={`inline-flex rounded-full border px-3 py-1 text-[13px] font-medium ${tone}`}>
+      {state}
+    </span>
   );
 }
