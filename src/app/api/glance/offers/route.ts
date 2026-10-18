@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Offer } from "@/data/types";
 import { demoMerchantOffersFor, sampleOffersForLabel } from "@/domain/sample";
 import { sponsoredOfferFor } from "@/server/ads";
-import { searchListingsCached } from "@/server/claude";
+import { lensListings, lensListingStream } from "@/server/listings";
 import { aiConfigured, supabaseConfigured } from "@/server/env";
 import { errorResponse, json, readJson } from "@/server/http";
 import { currentUser } from "@/server/supabase";
@@ -25,21 +25,12 @@ export async function POST(req: Request) {
       return json({ offers: [...(sponsored ? [sponsored] : []), ...rest.slice(0, 1), ...demo, ...rest.slice(1)], ranker: "sample" });
     }
     const wantsStream = (req.headers.get("accept") ?? "").includes("application/x-ndjson");
-    if (!wantsStream) {
-      const rest: Offer[] = [];
-      for await (const ev of searchListingsCached(label, body.candidate.id)) if (ev.offer) rest.push(ev.offer);
-      return json({ offers: [...(sponsored ? [sponsored] : []), ...rest.slice(0, 1), ...demo, ...rest.slice(1)], ranker: "live-grounded" });
-    }
     // Buyable demo-merchant and sponsored offers are known now; grounded web listings follow as they validate.
-    const enc = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const write = (o: unknown) => controller.enqueue(enc.encode(JSON.stringify(o) + "\n"));
-        for (const offer of [...(sponsored ? [sponsored] : []), ...demo]) write({ offer });
-        for await (const ev of searchListingsCached(label, body.candidate.id)) write(ev);
-        controller.close();
-      },
-    });
-    return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });
+    const lead: Offer[] = [...(sponsored ? [sponsored] : []), ...demo];
+    if (!wantsStream) {
+      const rest = await lensListings(label, { candidateId: body.candidate.id, signal: req.signal }).catch(() => [] as Offer[]);
+      return json({ offers: [...lead, ...rest], ranker: "live-grounded" });
+    }
+    return lensListingStream(label, { candidateId: body.candidate.id, lead, signal: req.signal });
   } catch (e) { return errorResponse(e); }
 }

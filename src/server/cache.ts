@@ -6,7 +6,7 @@ import { relayBackend } from "./relay";
  * Short-lived answer cache on the relay backend (Upstash in production, memory in development).
  * Only model answers that depend on the product, not the shopper, belong here.
  */
-export const CACHE_TTL = { insightMs: 24 * 60 * 60_000, listingsMs: 6 * 60 * 60_000 } as const;
+export const CACHE_TTL = { insightMs: 24 * 60 * 60_000 } as const;
 
 const keyFor = (scope: string, parts: (string | null | undefined)[]) =>
   `glance:cache:${scope}:${parts.map((p) => (p ?? "").trim().toLowerCase().replace(/\s+/g, " ")).join("|")}`.slice(0, 300);

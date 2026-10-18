@@ -208,7 +208,7 @@ export type LensEvent =
   | { type: "glimpse/scan-error"; scanId: number; error: string }
   | { type: "glimpse/choose"; candidateId: string }
   | { type: "glimpse/offers-loading"; query: string }
-  | { type: "glimpse/offers-result"; query: string; offers: Offer[]; done: boolean }
+  | { type: "glimpse/offers-result"; query: string; offers: Offer[]; done: boolean; replace?: boolean }
   | { type: "glimpse/offers-error"; query: string; error: string }
   | { type: "glimpse/offer-select"; offerId: string }
   | { type: "glimpse/offer-step"; delta: 1 | -1 }
@@ -250,7 +250,7 @@ export type LensEvent =
   // listings
   | { type: "listings/query"; query: string }
   | { type: "listings/loading"; query: string }
-  | { type: "listings/result"; query: string; offers: Offer[]; done: boolean }
+  | { type: "listings/result"; query: string; offers: Offer[]; done: boolean; replace?: boolean }
   | { type: "listings/error"; query: string; error: string }
   | { type: "listings/select"; offerId: string }
   | { type: "listings/step"; delta: 1 | -1 }

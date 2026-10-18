@@ -274,10 +274,10 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         (async () => {
           try {
             let first = true;
-            await timed("offers", () => svc.fetchOffers({ id: cand.id, label: cand.label }, s.capture, (offers, done) => {
+            await timed("offers", () => svc.fetchOffers({ id: cand.id, label: cand.label }, s.capture, (offers, done, replace) => {
               if (!stillCurrent() || c.signal.aborted) return;
               if (first && offers.length) { first = false; setDiag((d) => ({ ...d, tapToFirstCardMs: Math.round(performance.now() - t0) })); }
-              dispatch({ type: "glimpse/offers-result", query: cand.label, offers, done });
+              dispatch({ type: "glimpse/offers-result", query: cand.label, offers, done, replace });
             }, c.signal));
           } catch (e) {
             if (c.signal.aborted) return;
@@ -345,10 +345,10 @@ export function LensProvider({ children, capture = "sample", fixture = false, in
         const c = begin("listings");
         const t0 = performance.now();
         let count = 0;
-        svc.searchListings(q, (offers, done) => {
+        svc.searchListings(q, (offers, done, replace) => {
           if (!stillCurrent() || c.signal.aborted) return;
-          count += offers.length;
-          dispatch({ type: "listings/result", query: q, offers, done });
+          count = replace ? offers.length : count + offers.length;
+          dispatch({ type: "listings/result", query: q, offers, done, replace });
           if (done) setDiag((d) => ({ ...d, listingTimings: [...d.listingTimings.slice(-9), { query: q, ms: Math.round(performance.now() - t0), count }] }));
         }, c.signal).catch((e) => {
           if (c.signal.aborted) return;

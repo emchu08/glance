@@ -165,7 +165,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       return bump({ ...state, glimpse: { ...state.glimpse, offersStatus: "loading", offersQuery: event.query, offers: [] } });
     case "glimpse/offers-result": {
       if (state.glimpse.offersQuery !== event.query) return state; // stale query
-      const offers = mergeOffers(state.glimpse.offers, event.offers);
+      const offers = event.replace ? event.offers : mergeOffers(state.glimpse.offers, event.offers);
       const offerId = state.glimpse.offerId && offers.some((o) => o.id === state.glimpse.offerId) ? state.glimpse.offerId : offers[0]?.id ?? null;
       return bump({ ...state, glimpse: { ...state.glimpse, offers, offerId, offersStatus: event.done ? (offers.length ? "ready" : "empty") : "loading" } });
     }
@@ -389,7 +389,7 @@ export function lensReducer(state: LensState, event: LensEvent): LensState {
       return bump({ ...state, listings: { query: event.query, status: "loading", offers: [], offerId: null, error: null } });
     case "listings/result": {
       if (state.listings.query !== event.query) return state;
-      const offers = mergeOffers(state.listings.offers, event.offers);
+      const offers = event.replace ? event.offers : mergeOffers(state.listings.offers, event.offers);
       const offerId = state.listings.offerId && offers.some((o) => o.id === state.listings.offerId) ? state.listings.offerId : offers[0]?.id ?? null;
       return bump({ ...state, listings: { ...state.listings, offers, offerId, status: event.done ? (offers.length ? "ready" : "empty") : "loading" } });
     }

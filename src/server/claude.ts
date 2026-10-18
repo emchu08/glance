@@ -3,13 +3,11 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import type { Candidate, DishHypothesis, GroceryObservation, Offer, Recipe } from "@/data/types";
+import type { Candidate, DishHypothesis, GroceryObservation, Recipe } from "@/data/types";
 import { GROCERY_CATALOG } from "@/data/grocery";
 import { matchCatalogProduct, normalizedLabelKey } from "@/domain/grocery/matching";
 import { parseUsdLabel } from "@/domain/money";
-import { CACHE_TTL, readCache, writeCache } from "./cache";
 import { aiConfigured, env } from "./env";
-import { parsePublicHttpsUrl, retailerNameFromHost } from "./url";
 
 /**
  * Server-side Claude tasks. Every task uses structured outputs validated by zod and
@@ -196,85 +194,6 @@ export async function generateRecipes(dish: string, image: string | null): Promi
       steps: r.steps.map((s) => s.trim()).filter(Boolean), source: "generated" as const,
     }));
   return { recipes, model: res.model };
-}
-
-// ── Listing search (web search tool → grounded, validated offers) ────────────
-
-const ListingSchema = z.object({
-  listings: z.array(z.object({
-    product_name: z.string(), retailer: z.string(), url: z.string(), price_usd: z.number().nullable(), match: z.enum(["exact", "possible", "similar"]), is_product_page: z.boolean(), image_url: z.string().nullable(),
-  })).max(8),
-});
-
-export interface ListingStreamEvent { offer?: Offer; error?: string; done?: boolean; usage?: { searches: number } }
-
-/**
- * Grounded listing search. Claude performs web searches; we accept URLs only from tool
- * results, validate public HTTPS, and never manufacture prices or photos.
- */
-export async function* searchListings(query: string, candidateId?: string): AsyncGenerator<ListingStreamEvent> {
-  const q = query.trim().slice(0, 120);
-  if (!q) { yield { error: "Empty query" }; return; }
-  const c = anthropic();
-  let searches = 0;
-  const toolUrls = new Set<string>();
-  try {
-    const stream = c.messages.stream({
-      model: env.listingModel, max_tokens: 6000,
-      system: `You find real, currently purchasable product listings for a shopping assistant. Use web search (at most 3 searches; stop once you have enough). Return only URLs that appeared in search results. Prefer product detail pages over category pages. Mark match level honestly: exact requires matching brand/model; similar is a look-alike. Price in USD only when the result shows it. ${SAFETY}`,
-      messages: [{ role: "user", content: `Find up to 6 US listings for: ${q}` }],
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
-      output_config: { format: zodOutputFormat(ListingSchema), effort: QUICK },
-    });
-    const final = await stream.finalMessage();
-    for (const block of final.content) {
-      if (block.type === "web_search_tool_result") {
-        searches += 1;
-        const content = block.content;
-        if (Array.isArray(content)) for (const r of content) if (r.type === "web_search_result") toolUrls.add(r.url);
-      }
-    }
-    const text = final.content.find((b) => b.type === "text")?.text ?? "{}";
-    const parsed = ListingSchema.safeParse(JSON.parse(text));
-    if (!parsed.success) { yield { error: "Listing output did not validate" }; return; }
-    let i = 0;
-    for (const l of parsed.data.listings) {
-      let url: URL;
-      try { url = parsePublicHttpsUrl(l.url); } catch { continue; }
-      const allowed = toolUrls.has(l.url) || [...toolUrls].some((u) => { try { return new URL(u).hostname === url.hostname; } catch { return false; } });
-      if (!allowed) continue; // URL not grounded in search results
-      const price = l.price_usd !== null && l.price_usd > 0 && l.price_usd < 100000 ? Math.round(l.price_usd * 100) : null;
-      let image: string | null = null;
-      if (l.image_url) { try { image = parsePublicHttpsUrl(l.image_url).toString(); } catch { image = null; } }
-      const offer: Offer = {
-        id: `live-${Buffer.from(url.toString()).toString("base64url").slice(0, 24)}`, candidateId, query: q, name: l.product_name.trim().slice(0, 140), retailer: retailerNameFromHost(url.hostname),
-        url: url.toString(), imageUrl: image, priceCents: price, match: l.match, evidence: l.is_product_page ? "product page" : "category page", kind: "external_link", origin: "live",
-      };
-      i += 1;
-      yield { offer };
-    }
-    yield { done: true, usage: { searches } };
-  } catch (e) {
-    yield { error: (e as Error).message || "Search failed" };
-  }
-}
-
-/** Same grounded search, answered from cache when the query was searched recently. */
-export async function* searchListingsCached(query: string, candidateId?: string): AsyncGenerator<ListingStreamEvent> {
-  const cached = await readCache<Offer[]>("listings", [query]);
-  if (cached?.length) {
-    for (const offer of cached) yield { offer: { ...offer, candidateId } };
-    yield { done: true, usage: { searches: 0 } };
-    return;
-  }
-  const found: Offer[] = [];
-  let failed = false;
-  for await (const ev of searchListings(query, candidateId)) {
-    if (ev.offer) found.push(ev.offer);
-    if (ev.error) failed = true;
-    yield ev;
-  }
-  if (!failed && found.length) await writeCache("listings", [query], found, CACHE_TTL.listingsMs);
 }
 
 export const catalogSize = GROCERY_CATALOG.length;

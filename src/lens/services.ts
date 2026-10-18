@@ -106,8 +106,11 @@ const inflight = new Map<string, Promise<Offer[]>>();
 const listingCache = new Map<string, { offers: Offer[]; at: number }>();
 const CACHE_TTL = 10 * 60 * 1000;
 
+/** `replace`: the batch is the whole list in its final order (ranked), not more cards to merge in. */
+export type OfferBatch = (offers: Offer[], done: boolean, replace?: boolean) => void;
+
 /** Streams offers: buyable demo-merchant/sponsored rows first, grounded listings as they validate. */
-export async function fetchOffers(candidate: { id: string; label: string }, capture: CaptureKind, onBatch: (offers: Offer[], done: boolean) => void, signal?: AbortSignal): Promise<Offer[]> {
+export async function fetchOffers(candidate: { id: string; label: string }, capture: CaptureKind, onBatch: OfferBatch, signal?: AbortSignal): Promise<Offer[]> {
   if (capture === "sample") {
     await delay(SAMPLE_LATENCY_MS, signal);
     const offers = sampleOffersForLabel(candidate.label, candidate.id);
@@ -116,16 +119,26 @@ export async function fetchOffers(candidate: { id: string; label: string }, capt
   }
   const res = await fetch("/api/glance/offers", { method: "POST", headers: { "content-type": "application/json", accept: "application/x-ndjson" }, body: JSON.stringify({ candidate }), signal: withTimeout(signal, 40_000), credentials: "same-origin" });
   if (!res.ok || !res.body) throw new ServiceError(`Offer search failed (${res.status})`, res.status);
-  const all = await readNdjson(res.body, (offer) => onBatch([offer], false));
-  onBatch([], true);
+  const all = await readNdjson(res.body, (offers, replace) => onBatch(offers, false, replace));
+  onBatch(all, true, true);
   return all;
 }
 
-async function readNdjson(body: ReadableStream<Uint8Array>, onOffer: (offer: Offer) => void): Promise<Offer[]> {
+type ListingEvent =
+  | { type: "offer"; offer: Offer }
+  | { type: "update"; id: string; imageUrl?: string | null; priceCents?: number }
+  | { type: "ranked" | "done"; offers: Offer[] }
+  | { type: "error"; error: string };
+
+/**
+ * Reads the listing stream: cards as they are found, photo and price fill-ins for cards
+ * already shown, then the ranked list. Returns the final list in its final order.
+ */
+async function readNdjson(body: ReadableStream<Uint8Array>, emit: (offers: Offer[], replace: boolean) => void): Promise<Offer[]> {
   const reader = body.getReader();
   const dec = new TextDecoder();
   let buf = "";
-  const all: Offer[] = [];
+  let all: Offer[] = [];
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -135,31 +148,46 @@ async function readNdjson(body: ReadableStream<Uint8Array>, onOffer: (offer: Off
       const line = buf.slice(0, nl).trim();
       buf = buf.slice(nl + 1);
       if (!line) continue;
-      const msg = JSON.parse(line) as { offer?: Offer; error?: string; done?: boolean };
-      // Offers already shown stay usable when the web search fails afterwards.
-      if (msg.error) { if (all.length) return all; throw new ServiceError(msg.error); }
-      if (msg.offer) { all.push(msg.offer); onOffer(msg.offer); }
+      const msg = JSON.parse(line) as ListingEvent;
+      if (msg.type === "error") {
+        // Offers already shown stay usable when the web search fails afterwards.
+        if (all.length) return all;
+        throw new ServiceError(msg.error);
+      }
+      if (msg.type === "offer") {
+        all = [...all.filter((o) => o.id !== msg.offer.id), msg.offer];
+        emit([msg.offer], false);
+      } else if (msg.type === "update") {
+        const current = all.find((o) => o.id === msg.id);
+        if (!current) continue;
+        const next: Offer = { ...current, ...(msg.imageUrl !== undefined ? { imageUrl: msg.imageUrl } : {}), ...(msg.priceCents !== undefined ? { priceCents: msg.priceCents } : {}) };
+        all = all.map((o) => (o.id === msg.id ? next : o));
+        emit([next], false);
+      } else {
+        all = msg.offers;
+        emit(all, true);
+      }
     }
   }
   return all;
 }
 
 /** Streams NDJSON listings; calls onBatch as cards arrive. Shares in-flight work per query. */
-export async function searchListings(query: string, onBatch: (offers: Offer[], done: boolean) => void, signal?: AbortSignal): Promise<Offer[]> {
+export async function searchListings(query: string, onBatch: OfferBatch, signal?: AbortSignal): Promise<Offer[]> {
   const key = query.trim().toLowerCase();
   const cached = listingCache.get(key);
-  if (cached && Date.now() - cached.at < CACHE_TTL) { onBatch(cached.offers, true); return cached.offers; }
+  if (cached && Date.now() - cached.at < CACHE_TTL) { onBatch(cached.offers, true, true); return cached.offers; }
   if (inflight.has(key)) {
     const offers = await inflight.get(key)!;
-    onBatch(offers, true);
+    onBatch(offers, true, true);
     return offers;
   }
   const p = (async () => {
     const res = await fetch("/api/glance/listings", { method: "POST", headers: { "content-type": "application/json", accept: "application/x-ndjson" }, body: JSON.stringify({ query }), signal: withTimeout(signal, 40_000) });
     if (!res.ok || !res.body) throw new ServiceError(`Listing search failed (${res.status})`, res.status);
-    const all = await readNdjson(res.body, (offer) => onBatch([offer], false));
+    const all = await readNdjson(res.body, (offers, replace) => onBatch(offers, false, replace));
     listingCache.set(key, { offers: all, at: Date.now() });
-    onBatch([], true);
+    onBatch(all, true, true);
     return all;
   })();
   inflight.set(key, p);

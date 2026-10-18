@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -6,7 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 
 function tryFiles(base) {
-  for (const cand of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) if (existsSync(cand) && !cand.endsWith("/")) return cand;
+  // Files only: "@/server/listings" is a folder whose module is its index.ts.
+  for (const cand of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) if (statSync(cand, { throwIfNoEntry: false })?.isFile()) return cand;
   return null;
 }
 
